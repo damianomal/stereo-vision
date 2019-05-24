@@ -996,7 +996,7 @@ void StereoCamera::estimateEssential()
         Scalar den1,den2;
         den1=sum(Fxl);
         den2=sum(Fxr);
-        double sampsonDistance=xrFxl.at<double>(0,0)/(den1.val[0]+den2.val[0]);
+//        double sampsonDistance=xrFxl.at<double>(0,0)/(den1.val[0]+den2.val[0]);
 
         if (status[i]==1 && xrFxl.at<double>(0,0)<0.001)
         {
