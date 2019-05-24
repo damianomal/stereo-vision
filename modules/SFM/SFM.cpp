@@ -400,12 +400,23 @@ bool SFM::updateModule()
 
     if (outDisp.getOutputCount()>0)
     {
+
+        std::cout << "WITHIN OUTDISP.GETOUC" << std::endl;
+
         outputDm = stereo->getDisparity();
 
         if (!outputDm.empty())
         {
+
+            std::cout << "OUTPUT SIZE AND CHANNELS" << std::endl;
+            std::cout << outputDm.size() << std::endl;
+            std::cout << outputDm.channels() << std::endl;
+
             ImageOf<PixelMono> &outim = outDisp.prepare();
             Mat outimMat = toCvMat(outim);
+
+
+
             if (doBLF)
             {
                 Mat outputDfiltm;
@@ -414,8 +425,22 @@ bool SFM::updateModule()
             }
             else
             {
+
                 outimMat = outputDm;
             }
+
+            std::cout << "OUTIMMAT SIZE AND CHANNELS" << std::endl;
+            std::cout << outimMat.size() << std::endl;
+            std::cout << outimMat.channels() << std::endl;
+
+            cv::namedWindow("PROVA");
+            cv::imshow("PROVA", leftMat);
+            cv::namedWindow("PROVA1");
+            cv::imshow("PROVA1", rightMat);
+            cv::namedWindow("PROVA2");
+            cv::imshow("PROVA2", outimMat);
+            cv::waitKey(1);
+
             outDisp.write();
         }
     }

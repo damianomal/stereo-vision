@@ -35,6 +35,7 @@ private:
     ImVec4 clear_color;
     bool done;
     int val;
+    bool updated;
 
 public:
 
@@ -47,7 +48,8 @@ public:
     void setVal(int);
     int getVal();
     bool isDone();
-
+    bool isUpdated();
+    void setUpdated(bool);
 };
 
 #endif // GUI_H

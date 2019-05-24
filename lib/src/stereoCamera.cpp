@@ -523,6 +523,8 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         int minDisparity, int preFilterCap, int disp12MaxDiff)
 {
 
+//    std::cout << "COMPUTE DISPARITY" << std::endl;
+
     if (this->Kleft.empty() || this->DistL.empty() || this->Kright.empty() || this->DistR.empty())
     {
         cout <<" Cameras are not calibrated! Run the Calibration first!" << endl;
@@ -536,6 +538,8 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
     }
 
     Size img_size=this->imleft.size();
+
+//    std::cout << "BEFORE IF CAMERACHANGED" << std::endl;
 
     if (cameraChanged)
     {
@@ -553,6 +557,8 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         }
         mutex->post();
     }
+
+//    std::cout << "BEFORE IF CAMERACHANGED2" << std::endl;
 
     if (cameraChanged)
     {
@@ -573,41 +579,53 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 
     bool success;
 
+//    std::cout << "BEFORE IF USEELAS" << std::endl;
+
     if (use_elas)
     {
         success = elaswrap->compute_disparity(img1r, img2r, disp, numberOfDisparities);
+
+//        std::cout << "ELAS SUCCESS: " << success << std::endl;
+
+//        std::cout << img1r.size() << std::endl;
+
         if (success)
         {
+//            std::cout << numberOfDisparities << std::endl;
+
             map = disp * (255.0 / numberOfDisparities);
             //threshold(map, map, 0, 255.0, THRESH_TOZERO);
         }
     } else
     {
         int cn=this->imleft.channels();
-    #ifdef OPENCV_GREATER_2
+//    #ifdef OPENCV_GREATER_2
         Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
                                                     8*cn*SADWindowSize*SADWindowSize,
                                                     32*cn*SADWindowSize*SADWindowSize,
                                                     disp12MaxDiff,preFilterCap,uniquenessRatio,
                                                     speckleWindowSize,speckleRange,
                                                     best?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
-        sgbm->compute(img1r, img2r, disp);
-    #else
-        StereoSGBM sgbm;
-        sgbm.preFilterCap =         preFilterCap; //63
-        sgbm.SADWindowSize =        SADWindowSize;        
-        sgbm.P1 =                   8*cn*SADWindowSize*SADWindowSize;
-        sgbm.P2 =                   32*cn*SADWindowSize*SADWindowSize;
-        sgbm.minDisparity =         minDisparity; //-15
-        sgbm.numberOfDisparities =  numberOfDisparities;
-        sgbm.uniquenessRatio =      uniquenessRatio; //22
-        sgbm.speckleWindowSize =    speckleWindowSize; //100
-        sgbm.speckleRange =         speckleRange; //32
-        sgbm.disp12MaxDiff =        disp12MaxDiff;
-        sgbm.fullDP =               best; // alg == STEREO_HH
 
-        sgbm(img1r, img2r, disp);
-    #endif
+//        std::cout << "RUNNING SGBM" << std::endl;
+
+        sgbm->compute(img1r, img2r, disp);
+//    #else
+//        StereoSGBM sgbm;
+//        sgbm.preFilterCap =         preFilterCap; //63
+//        sgbm.SADWindowSize =        SADWindowSize;
+//        sgbm.P1 =                   8*cn*SADWindowSize*SADWindowSize;
+//        sgbm.P2 =                   32*cn*SADWindowSize*SADWindowSize;
+//        sgbm.minDisparity =         minDisparity; //-15
+//        sgbm.numberOfDisparities =  numberOfDisparities;
+//        sgbm.uniquenessRatio =      uniquenessRatio; //22
+//        sgbm.speckleWindowSize =    speckleWindowSize; //100
+//        sgbm.speckleRange =         speckleRange; //32
+//        sgbm.disp12MaxDiff =        disp12MaxDiff;
+//        sgbm.fullDP =               best; // alg == STEREO_HH
+
+//        sgbm(img1r, img2r, disp);
+//    #endif
 
         disp.convertTo(map, CV_32FC1, 1.0,0.0);
         map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
@@ -652,6 +670,9 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         Mat x;
         remap(map,dispTemp,this->MapperL,x,cv::INTER_LINEAR);
         dispTemp.convertTo(disp8,CV_8U);
+
+//        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
+//        std::cout << disp.size() << std::endl;
 
         if (use_elas)
             disp.convertTo(disp, CV_16SC1, 16.0);

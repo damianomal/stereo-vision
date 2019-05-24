@@ -3,6 +3,13 @@
 GUI::GUI()
 {
 //    this->io = ImGuiIO::GetIO();
+    this->val = 0;
+    this->updated = false;
+}
+
+bool GUI::isUpdated()
+{
+    return this->updated;
 }
 
 
@@ -37,7 +44,7 @@ int GUI::initializeGUI()
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        this->window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 400, 400, window_flags);
+        this->window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 400, 130, window_flags);
         this->gl_context = SDL_GL_CreateContext(window);
         SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -76,6 +83,11 @@ int GUI::initializeGUI()
         this->done = false;
 }
 
+int GUI::getVal()
+{
+    return this->val;
+}
+
 void GUI::killGUI()
 {
     ImGui_ImplOpenGL3_Shutdown();
@@ -89,6 +101,7 @@ void GUI::killGUI()
 
 void GUI::updateGUI()
 {
+
     // GUI UPDATE
     SDL_Event event;
 
@@ -132,10 +145,13 @@ void GUI::updateGUI()
     //     // do stuff
     // }
     // ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
-    ImGui::SliderInt("speckleWin", &this->val, 50, 200);
+    ImGui::SliderInt("speckleWin", &this->val, 0, 20);
 
     if (ImGui::IsItemActive() == 0 && prev_state == 1)
+    {
+        this->updated = true;
         std::cout << "Released" << std::endl;
+    }
 
     prev_state = ImGui::IsItemActive();
 
@@ -161,4 +177,9 @@ bool GUI::isDone()
 GUI::~GUI()
 {
     this->killGUI();
+}
+
+void GUI::setUpdated(bool v)
+{
+    this->updated = v;
 }

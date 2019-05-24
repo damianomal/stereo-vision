@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <yarp/cv/Cv.h>
 #include "DispModule.h"
+#include <chrono>
 
 using namespace yarp::cv;
 
@@ -54,7 +55,7 @@ bool DispModule::configure(ResourceFinder & rf)
     outDispName=sname+outDispName;
 
     string rpc_name=sname+"/rpc";
-    string world_name=sname+rf.check("outWorldPort",Value("/world")).asString();
+//    string world_name=sname+rf.check("outWorldPort",Value("/world")).asString();
 
     int calib=rf.check("useCalibrated",Value(1)).asInt();
     bool useCalibrated=(calib!=0);
@@ -131,8 +132,10 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else if (this->usePorts)
     {
-        string left=rf.check("leftPort",Value("/i:i")).asString();
-        string right=rf.check("rightPort",Value("/right:i")).asString();
+        string fakeEyes=rf.check("fakeEyesPort",Value("/fakeEyes:i")).asString();
+
+        fakeEkesPort.open(fakeEyes);
+//        =rf.check("rightPort",Value("/right:i")).asString();
     }
     else
     {
@@ -277,6 +280,12 @@ bool DispModule::updateModule()
     ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
     ImageOf<PixelRgb> *yarp_imgR=rightImgPort.read(true);
 
+    if(this->usePorts)
+    {
+        // code to read from fakeEyes port
+    }
+
+
     Stamp stamp_left, stamp_right;
     leftImgPort.getEnvelope(stamp_left);
     rightImgPort.getEnvelope(stamp_right);
@@ -346,11 +355,22 @@ bool DispModule::updateModule()
     }
     mutexRecalibration.unlock();
 
+    if(this->gui.isUpdated())
+    {
+        std::cout << "Updating..." << std::endl;
+
+        this->mutexDisp.lock();
+        this->disp12MaxDiff=this->gui.getVal();
+        this->mutexDisp.unlock();
+        this->gui.setUpdated(false);
+    }
+
     mutexDisp.lock();
     this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
             this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
             this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
     mutexDisp.unlock();
+
 
     if (outDisp.getOutputCount()>0)
     {
@@ -359,12 +379,9 @@ bool DispModule::updateModule()
         if (!outputDm.empty())
         {
             ImageOf<PixelMono> &outim = outDisp.prepare();
-            Mat outimMat = toCvMat(outim);
+            Mat outimMat;
             if (doBLF)
             {
-                // TODO: why does this processing cannot be done in-place? is it due to
-                // how the bilateralFilter function has been implemented?
-
                 Mat outputDfiltm;
                 cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
                 outimMat = outputDfiltm;
@@ -373,15 +390,14 @@ bool DispModule::updateModule()
             {
                 outimMat = outputDm;
             }
+            outim = fromCvMat<PixelMono>(outimMat);
             outDisp.write();
         }
     }
 
     if (outDepth.getOutputCount()>0)
     {
-
         // to write
-
 
         outDepth.write();
     }
@@ -547,110 +563,6 @@ void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
 
 }
 
-
-/******************************************************************************/
-//Point3f DispModule::get3DPointsAndDisp(int u, int v, int& uR, int& vR, const string &drive)
-//{
-//    Point3f point(0.0f,0.0f,0.0f);
-//    if ((drive!="RIGHT") && (drive!="LEFT") && (drive!="ROOT"))
-//        return point;
-
-//    LockGuard lg(mutexDisp);
-
-//    // Mapping from Rectified Cameras to Original Cameras
-//    const Mat& Mapper=this->stereo->getMapperL();
-//    if (Mapper.empty())
-//        return point;
-
-//    float usign=Mapper.ptr<float>(v)[2*u];
-//    float vsign=Mapper.ptr<float>(v)[2*u+1];
-
-//    u=cvRound(usign);
-//    v=cvRound(vsign);
-
-//    const Mat& disp16m=this->stereo->getDisparity16();
-//    if (disp16m.empty() || (u<0) || (u>=disp16m.cols) || (v<0) || (v>=disp16m.rows))
-//        return point;
-
-//    const Mat& Q=this->stereo->getQ();
-//    IplImage disp16=disp16m;
-//    CvScalar scal=cvGet2D(&disp16,v,u);
-//    double disparity=scal.val[0]/16.0;
-
-//    uR=u-(int)disparity;
-//    vR=(int)v;
-
-//    Point2f orig=this->stereo->fromRectifiedToOriginal(uR,vR,RIGHT);
-//    uR=(int)orig.x;
-//    vR=(int)orig.y;
-
-//    float w=(float)(disparity*Q.at<double>(3,2)+Q.at<double>(3,3));
-//    point.x=(float)((usign+1)*Q.at<double>(0,0)+Q.at<double>(0,3));
-//    point.y=(float)((vsign+1)*Q.at<double>(1,1)+Q.at<double>(1,3));
-//    point.z=(float)Q.at<double>(2,3);
-
-//    point.x/=w;
-//    point.y/=w;
-//    point.z/=w;
-
-//    // discard points far more than 10 meters or with not valid disparity (<0)
-//    if ((point.z>10.0f) || (point.z<0.0f))
-//        return point;
-
-//    if (drive=="ROOT")
-//    {
-//        const Mat& RLrect=this->stereo->getRLrect().t();
-//        Mat Tfake=Mat::zeros(0,3,CV_64F);
-//        Mat P(4,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-//        P.at<double>(3,0)=1.0;
-
-//        Mat Hrect=buildRotTras(RLrect,Tfake);
-//        P=HL_root*Hrect*P;
-//        point.x=(float)(P.at<double>(0,0)/P.at<double>(3,0));
-//        point.y=(float)(P.at<double>(1,0)/P.at<double>(3,0));
-//        point.z=(float)(P.at<double>(2,0)/P.at<double>(3,0));
-//    }
-//    else if (drive=="LEFT")
-//    {
-//        Mat P(3,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-
-//        P=this->stereo->getRLrect().t()*P;
-//        point.x=(float)P.at<double>(0,0);
-//        point.y=(float)P.at<double>(1,0);
-//        point.z=(float)P.at<double>(2,0);
-//    }
-//    else if (drive=="RIGHT")
-//    {
-//        const Mat& Rright=this->stereo->getRotation();
-//        const Mat& Tright=this->stereo->getTranslation();
-//        const Mat& RRright=this->stereo->getRRrect().t();
-//        Mat TRright=Mat::zeros(0,3,CV_64F);
-
-//        Mat HRL=buildRotTras(Rright,Tright);
-//        Mat Hrect=buildRotTras(RRright,TRright);
-
-//        Mat P(4,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-//        P.at<double>(3,0)=1.0;
-
-//        P=Hrect*HRL*P;
-//        point.x=(float)(P.at<double>(0,0)/P.at<double>(3,0));
-//        point.y=(float)(P.at<double>(1,0)/P.at<double>(3,0));
-//        point.z=(float)(P.at<double>(2,0)/P.at<double>(3,0));
-//    }
-
-//    return point;
-//}
-
-
 /******************************************************************************/
 Point3f DispModule::get3DPoints(int u, int v, const string &drive)
 {
@@ -747,97 +659,6 @@ Point3f DispModule::get3DPoints(int u, int v, const string &drive)
 
     return point;
 }
-
-
-/******************************************************************************/
-//Point3f DispModule::get3DPointMatch(double u1, double v1, double u2, double v2,
-//                             const string &drive)
-//{
-//    Point3f point(0.0f,0.0f,0.0f);
-//    if ((drive!="RIGHT") && (drive!="LEFT") && (drive!="ROOT"))
-//        return point;
-
-//    LockGuard lg(mutexDisp);
-//    // Mapping from Rectified Cameras to Original Cameras
-//    const Mat& MapperL=this->stereo->getMapperL();
-//    const Mat& MapperR=this->stereo->getMapperR();
-//    if (MapperL.empty() || MapperR.empty())
-//        return point;
-
-//    if ((cvRound(u1)<0) || (cvRound(u1)>=MapperL.cols) || (cvRound(v1)<0) || (cvRound(v1)>=MapperL.rows) ||
-//        (cvRound(u2)<0) || (cvRound(u2)>=MapperL.cols) || (cvRound(v2)<0) || (cvRound(v2)>=MapperL.rows))
-//        return point;
-
-//    float urect1=MapperL.ptr<float>(cvRound(v1))[2*cvRound(u1)];
-//    float vrect1=MapperL.ptr<float>(cvRound(v1))[2*cvRound(u1)+1];
-
-//    float urect2=MapperR.ptr<float>(cvRound(v2))[2*cvRound(u2)];
-//    float vrect2=MapperR.ptr<float>(cvRound(v2))[2*cvRound(u2)+1];
-
-//    const Mat& Q=this->stereo->getQ();
-//    double disparity=urect1-urect2;
-//    float w=(float)(disparity*Q.at<double>(3,2)+Q.at<double>(3,3));
-//    point.x=(float)((urect1+1)*Q.at<double>(0,0)+Q.at<double>(0,3));
-//    point.y=(float)((vrect1+1)*Q.at<double>(1,1)+Q.at<double>(1,3));
-//    point.z=(float)Q.at<double>(2,3);
-
-//    point.x/=w;
-//    point.y/=w;
-//    point.z/=w;
-
-//    if (drive=="ROOT")
-//    {
-//        const Mat& RLrect=this->stereo->getRLrect().t();
-//        Mat Tfake=Mat::zeros(0,3,CV_64F);
-//        Mat P(4,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-//        P.at<double>(3,0)=1.0;
-
-//        Mat Hrect=buildRotTras(RLrect,Tfake);
-//        P=HL_root*Hrect*P;
-//        point.x=(float)(P.at<double>(0,0)/P.at<double>(3,0));
-//        point.y=(float)(P.at<double>(1,0)/P.at<double>(3,0));
-//        point.z=(float)(P.at<double>(2,0)/P.at<double>(3,0));
-//    }
-//    else if (drive=="LEFT")
-//    {
-//        Mat P(3,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-
-//        P=this->stereo->getRLrect().t()*P;
-//        point.x=(float)P.at<double>(0,0);
-//        point.y=(float)P.at<double>(1,0);
-//        point.z=(float)P.at<double>(2,0);
-//    }
-//    else if (drive=="RIGHT")
-//    {
-//        const Mat& Rright=this->stereo->getRotation();
-//        const Mat& Tright=this->stereo->getTranslation();
-//        const Mat& RRright=this->stereo->getRRrect().t();
-//        Mat TRright=Mat::zeros(0,3,CV_64F);
-
-//        Mat HRL=buildRotTras(Rright,Tright);
-//        Mat Hrect=buildRotTras(RRright,TRright);
-
-//        Mat P(4,1,CV_64FC1);
-//        P.at<double>(0,0)=point.x;
-//        P.at<double>(1,0)=point.y;
-//        P.at<double>(2,0)=point.z;
-//        P.at<double>(3,0)=1.0;
-
-//        P=Hrect*HRL*P;
-//        point.x=(float)(P.at<double>(0,0)/P.at<double>(3,0));
-//        point.y=(float)(P.at<double>(1,0)/P.at<double>(3,0));
-//        point.z=(float)(P.at<double>(2,0)/P.at<double>(3,0));
-//    }
-
-//    return point;
-//}
-
 
 /******************************************************************************/
 Mat DispModule::buildRotTras(const Mat& R, const Mat& T)
@@ -1046,45 +867,6 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
                                 minDisparity,preFilterCap,disp12MaxDiff);
         reply.addString("ACK");
     }
-//    else if (command.get(0).asString()=="Point" || command.get(0).asString()=="Left" )
-//    {
-//        int u = command.get(1).asInt();
-//        int v = command.get(2).asInt();
-//        Point3f point = this->get3DPoints(u,v);
-//        reply.addDouble(point.x);
-//        reply.addDouble(point.y);
-//        reply.addDouble(point.z);
-//    }
-//    else if (!command.get(0).isString() && command.size()==2)
-//    {
-//        int u = command.get(0).asInt();
-//        int v = command.get(1).asInt();
-//        int uR,vR;
-//        Point3f point = this->get3DPointsAndDisp(u,v,uR,vR,"ROOT");
-//        reply.addDouble(point.x);
-//        reply.addDouble(point.y);
-//        reply.addDouble(point.z);
-//        reply.addInt(uR);
-//        reply.addInt(vR);
-//    }
-//    else if (command.get(0).asString()=="Right")
-//    {
-//        int u = command.get(1).asInt();
-//        int v = command.get(2).asInt();
-//        Point3f point = this->get3DPoints(u,v,"RIGHT");
-//        reply.addDouble(point.x);
-//        reply.addDouble(point.y);
-//        reply.addDouble(point.z);
-//    }
-//    else if (command.get(0).asString()=="Root")
-//    {
-//        int u = command.get(1).asInt();
-//        int v = command.get(2).asInt();
-//        Point3f point = this->get3DPoints(u,v,"ROOT");
-//        reply.addDouble(point.x);
-//        reply.addDouble(point.y);
-//        reply.addDouble(point.z);
-//    }
     else if (command.get(0).asString()=="Rect")
     {
         int tl_u = command.get(1).asInt();
@@ -1119,32 +901,6 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
             reply.addDouble(point.z);
         }
     }
-//    else if (command.get(0).asString()=="Flood3D")
-//    {
-//        cv::Point seed(command.get(1).asInt(),
-//                       command.get(2).asInt());
-
-//        double dist=0.004;
-//        if (command.size()>=4)
-//            dist=command.get(3).asDouble();
-        
-//        Point3f p=get3DPoints(seed.x,seed.y,"ROOT");
-//        if (cv::norm(p)>0.0)
-//        {
-//            reply.addInt(seed.x);
-//            reply.addInt(seed.y);
-//            reply.addDouble(p.x);
-//            reply.addDouble(p.y);
-//            reply.addDouble(p.z);
-
-//            set<int> visited;
-//            visited.insert(seed.x*outputDm.cols+seed.y);
-
-//            floodFill(seed,p,dist,visited,reply);
-//        }
-//        else
-//            reply.addString("NACK");
-//    }
     else if (command.get(0).asString()=="cart2stereo")
     {
         double x = command.get(1).asDouble();
@@ -1194,21 +950,6 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         reply.addDouble(sigmaColorBLF);
         reply.addDouble(sigmaSpaceBLF);
     }
-//    else if(command.size()>0 && command.size()%4==0)
-//    {
-//        for (int i=0; i<command.size(); i+=4)
-//        {
-//            double ul = command.get(i).asDouble();
-//            double vl = command.get(i+1).asDouble();
-//            double ur = command.get(i+2).asDouble();
-//            double vr = command.get(i+3).asDouble();
-
-//            Point3f point= this->get3DPointMatch(ul,vl,ur,vr,"ROOT");
-//            reply.addDouble(point.x);
-//            reply.addDouble(point.y);
-//            reply.addDouble(point.z);
-//        }
-//    }
     else
         reply.addString("NACK");
 

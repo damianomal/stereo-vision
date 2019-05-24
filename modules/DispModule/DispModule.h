@@ -278,6 +278,7 @@ class DispModule: public yarp::os::RFModule
     yarp::os::Port rpc;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > leftImgPort;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > rightImgPort;
+    yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > fakeEyesPort;
 //    BufferedPort<ImageOf<PixelRgbFloat> > worldCartPort;
 //    BufferedPort<ImageOf<PixelRgbFloat> > worldCylPort;
     Port handlerPort;
