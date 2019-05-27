@@ -97,7 +97,7 @@ int GUI::initializeGUI()
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        this->window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 260, window_flags);
+        this->window = SDL_CreateWindow("SGBM parameters", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 300, window_flags);
         this->gl_context = SDL_GL_CreateContext(window);
         SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -176,33 +176,15 @@ void GUI::updateGUI()
 
     // ------------------------------
 
-//    static int prev_state = 0;
-
     this->updated |= ImGui::SliderInt("MinDisparity", &this->minDisparity, 0, 20);
 
-//    if (ImGui::IsItemActive() == 0 && prev_state == 1)
-//        this->updated = true;
-
-//    if(ImGui::IsItemActive())
-//        this->updated = true;
-
-//    prev_state_1 = ImGui::IsItemActive();
-
+    this->updated |= ImGui::RadioButton("32", &this->numberOfDisparities, 32); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("64", &this->numberOfDisparities, 64); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("96", &this->numberOfDisparities, 96); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128);ImGui::SameLine();
     ImGui::Text("numberOfDisparities");
 
-
     this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
-
-//    if (ImGui::IsItemActive() == 0 && prev_state == 1)
-//        this->updated = true;
-
-//    if(ImGui::IsItemActive())
-//        this->updated = true;
-
-
-//    prev_state_2 = ImGui::IsItemActive();
 
     this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 20);
 
@@ -218,26 +200,11 @@ void GUI::updateGUI()
 
     this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
 
-//    this->updated |= ImGui::SliderScalarN("sigmaColorBLF", ImGuiDataType_Double, (void*)&this->sigmaColorBLF, 100, 1.0f, 20.0f, "%.2f");
+    this->recalibrate = ImGui::Button("Recalibrate");
 
-//    this->updated |= ImGui::SliderScalarN("sigmaSpaceBLF", ImGuiDataType_Double, (void*)&this->sigmaSpaceBLF, 100, 1.0f, 20.0f, "%.2f");
-
-//    **** this->minDisparity = minDisparity;
-//    *** this->numberOfDisparities = numberOfDisparities;
-//    *** this->SADWindowSize = SADWindowSize;
-//    *** this->disp12MaxDiff = disp12MaxDiff;
-//    *** this->preFilterCap = preFilterCap;
-//    ** this->uniquenessRatio = uniquenessRatio;
-//    this->speckleWindowSize = speckleWindowSize;
-//    this->speckleRange = speckleRange;
-//    this->sigmaColorBLF = sigmaColorBLF;
-//    this->sigmaSpaceBLF = sigmaSpaceBLF;
+    this->updated |= this->recalibrate;
 
     // ------------------------------
-
-
-        // std::cout << "Return Value:" << r << std::endl;
-        // std::cout << "IsActive:" << ImGui::IsItemActive() << std::endl;
 
     // Rendering
     ImGui::Render();
@@ -277,7 +244,19 @@ GUI::~GUI()
     this->killGUI();
 }
 
+bool GUI::toRecalibrate()
+{
+    return this->recalibrate;
+}
+
+
 void GUI::setUpdated(bool v)
 {
     this->updated = v;
+}
+
+void GUI::setUpdated(bool v, bool v2)
+{
+    this->updated = v;
+    this->recalibrate = v2;
 }

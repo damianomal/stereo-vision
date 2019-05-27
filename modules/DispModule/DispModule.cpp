@@ -22,7 +22,14 @@
 #include "DispModule.h"
 #include <chrono>
 
+// --- DEBUG
+#define PROF_S {start = std::chrono::high_resolution_clock::now();}
+#define PROF_E {stop = std::chrono::high_resolution_clock::now();}
+#define PROF_D(N) {duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); this->debug_timings[N] += duration.count();}
+
+
 using namespace yarp::cv;
+
 
 bool DispModule::configure(ResourceFinder & rf)
 {
@@ -179,6 +186,11 @@ bool DispModule::configure(ResourceFinder & rf)
     doSFM=false;
     updateViaGazeCtrl(false);
 
+    this->debug_count = 0;
+
+    for(int i = 0; i < 10; i++)
+        this->debug_timings[i] = 0;
+
     return true;
 
 }
@@ -286,6 +298,10 @@ bool DispModule::updateModule()
     ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
     ImageOf<PixelRgb> *yarp_imgR=rightImgPort.read(true);
 
+    auto start = std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
     if(this->usePorts)
     {
         // code to read from fakeEyes port
@@ -304,8 +320,19 @@ bool DispModule::updateModule()
     iencs->getEncoder(nHeadAxes-2,&eyes[1]);
     iencs->getEncoder(nHeadAxes-1,&eyes[2]);
 
+    PROF_S
+
     updateViaKinematics(eyes-eyes0);
+
+    PROF_E
+    PROF_D(0)
+
+    PROF_S
+
     updateViaGazeCtrl(false);
+
+    PROF_E
+    PROF_D(1)
 
     leftMat=toCvMat(*yarp_imgL);
     rightMat=toCvMat(*yarp_imgR);
@@ -323,7 +350,29 @@ bool DispModule::updateModule()
     getCameraHGazeCtrl(LEFT);
     getCameraHGazeCtrl(RIGHT);
 
+    PROF_S
+
     this->stereo->setImages(leftMat,rightMat);
+
+    PROF_E
+    PROF_D(2)
+    PROF_S
+
+    if(this->gui.isUpdated() && this->gui.toRecalibrate())
+    {
+        std::cout << "Updating..." << std::endl;
+
+        mutexRecalibration.lock();
+        numberOfTrials=0;
+        doSFM=true;
+        mutexRecalibration.unlock();
+
+        this->gui.setUpdated(false, false);
+    }
+
+    PROF_E
+    PROF_D(3)
+    PROF_S
 
     mutexRecalibration.lock();
 
@@ -336,6 +385,7 @@ bool DispModule::updateModule()
         mutexDisp.lock();
         this->stereo->setMatches(leftM,rightM);
 #else
+
         mutexDisp.lock();
         this->stereo->findMatch(false);
 #endif
@@ -348,6 +398,13 @@ bool DispModule::updateModule()
             calibUpdated=true;
             doSFM=false;
             calibEndEvent.signal();
+
+            R0=this->stereo->getRotation();
+            T0=this->stereo->getTranslation();
+            eyes0=eyes;
+
+            std::cout << "Calibration Successful!" << std::endl;
+
         }
         else
         {
@@ -356,15 +413,21 @@ bool DispModule::updateModule()
                 calibUpdated=false;
                 doSFM=false;
                 calibEndEvent.signal();
+
+                std::cout << "Calibration failed after 5 trials.. Please show a non planar scene." << std::endl;
+
             }
         }
     }
+
     mutexRecalibration.unlock();
 
+    PROF_E
+    PROF_D(4)
+
+    PROF_S
     if(this->gui.isUpdated())
     {
-        std::cout << "Updating..." << std::endl;
-
         this->mutexDisp.lock();
 
         this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
@@ -375,11 +438,23 @@ bool DispModule::updateModule()
         this->gui.setUpdated(false);
     }
 
+    PROF_E
+    PROF_D(5)
+
+    PROF_S
+
     mutexDisp.lock();
+
     this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-            this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-            this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+                this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+
     mutexDisp.unlock();
+
+    PROF_E
+    PROF_D(6)
+
+    PROF_S
 
     if (outDisp.getOutputCount()>0)
     {
@@ -404,10 +479,12 @@ bool DispModule::updateModule()
         }
     }
 
+    PROF_E
+    PROF_D(7)
+
     if (outDepth.getOutputCount()>0)
     {
         // to write
-
         outDepth.write();
     }
 
@@ -416,6 +493,37 @@ bool DispModule::updateModule()
 
     if(this->gui.isDone())
         this->gui.killGUI();
+
+    debug_count++;
+
+    if(debug_count == 100)
+    {
+//        std::cout << std::endl << "---- AVERAGE TIMING OVER 100 FRAMES ----" << std::endl;
+//        std::cout << "updateViaKinematics: " << this->debug_timings[0] / debug_count << " micros" << std::endl;
+//        std::cout << "updateViaGazeCtrl: " << this->debug_timings[1] / debug_count << " micros" << std::endl;
+//        std::cout << "getCameraHGazeCtrlx2: " << this->debug_timings[2] / debug_count << " micros" << std::endl;
+//        std::cout << "gui.recalibrate: " << this->debug_timings[3] / debug_count << " micros" << std::endl;
+//        std::cout << "doSFM: " << this->debug_timings[4] / debug_count << " micros" << std::endl;
+//        std::cout << "gui.isUpdated: " << this->debug_timings[5] / debug_count << " micros" << std::endl;
+//        std::cout << "computeDisparity: " << this->debug_timings[6] / debug_count << " micros" << std::endl;
+
+
+        std::cout << std::endl << "---- AVERAGE TIMING OVER 100 FRAMES ----" << std::endl;
+        std::cout << "updateViaKinematics: " << (this->debug_timings[0] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "updateViaGazeCtrl: " << (this->debug_timings[1] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "getCameraHGazeCtrlx2: " << (this->debug_timings[2] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "gui.recalibrate: " << (this->debug_timings[3] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "doSFM: " << (this->debug_timings[4] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "gui.isUpdated: " << (this->debug_timings[5] / debug_count) / 1000 << " ms" << std::endl;
+        std::cout << "computeDisparity: " << (this->debug_timings[6] / debug_count) / 1000 << " ms" << std::endl;
+
+        for(int i = 0; i < 7; i++)
+            this->debug_timings[i] = 0;
+
+        //         std::cout << "" << this->debug_timings[7] << "micros" << std::endl;
+//         std::cout << "" << this->debug_timings[8] << "micros" << std::endl;
+        debug_count = 0;
+    }
 
     return true;
 }

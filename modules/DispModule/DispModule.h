@@ -311,6 +311,11 @@ class DispModule: public yarp::os::RFModule
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
 
+    // --- TEMP
+    int debug_timings[10];
+    int debug_count;
+
+
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
     IGazeControl* igaze;

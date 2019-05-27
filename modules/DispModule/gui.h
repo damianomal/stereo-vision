@@ -36,6 +36,7 @@ private:
     bool done;
     int val;
     bool updated;
+    bool recalibrate;
 
     int uniquenessRatio;
     int speckleWindowSize;
@@ -70,6 +71,9 @@ public:
     bool isDone();
     bool isUpdated();
     void setUpdated(bool);
+    void setUpdated(bool, bool);
+
+    bool toRecalibrate();
 };
 
 #endif // GUI_H
