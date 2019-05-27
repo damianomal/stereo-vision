@@ -1,9 +1,44 @@
 #include "gui.h"
 
+//enum params{UNIQUENESS_RATIO,
+//            SPECKLEWINDOW,
+//            SADWINDOW,
+//            MINDISP,
+//            PREFILTERCAP,
+//            DISP12MAXDIFF,
+//            NUMDISPARITIES,
+//            BLFSIGMACOLOR,
+//            BLFSIGMASPACE};
+
+
+
+
+//this->uniquenessRatio=15;
+//this->speckleWindowSize=50;
+//this->speckleRange=16;
+//this->SADWindowSize=7;
+//this->minDisparity=0;
+//this->preFilterCap=63;
+//this->disp12MaxDiff=0;
+
+//this->numberOfDisparities = 96;
+
+//this->doBLF = !rf.check("skipBLF");
+//this->debugWindow = !rf.check("debug");
+
+//if(this->debugWindow)
+//    this->gui.initializeGUI();
+
+//cout << " Bilateral filter set to " << doBLF << endl;
+//this->sigmaColorBLF = 10.0;
+//this->sigmaSpaceBLF = 10.0;
+
+
+
 GUI::GUI()
 {
 //    this->io = ImGuiIO::GetIO();
-    this->val = 0;
+//    this->minDisp = 0;
     this->updated = false;
 }
 
@@ -12,7 +47,25 @@ bool GUI::isUpdated()
     return this->updated;
 }
 
+int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowSize,
+                       int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
+                       int speckleWindowSize, int speckleRange, double sigmaColorBLF,
+                       double sigmaSpaceBLF)
+{
 
+    this->minDisparity = minDisparity;
+    this->numberOfDisparities = numberOfDisparities;
+    this->SADWindowSize = SADWindowSize;
+    this->disp12MaxDiff = disp12MaxDiff;
+    this->preFilterCap = preFilterCap;
+    this->uniquenessRatio = uniquenessRatio;
+    this->speckleWindowSize = speckleWindowSize;
+    this->speckleRange = speckleRange;
+    this->sigmaColorBLF = sigmaColorBLF;
+    this->sigmaSpaceBLF = sigmaSpaceBLF;
+
+    return GUI::initializeGUI();
+}
 
 int GUI::initializeGUI()
 {
@@ -44,7 +97,7 @@ int GUI::initializeGUI()
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        this->window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 400, 130, window_flags);
+        this->window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 260, window_flags);
         this->gl_context = SDL_GL_CreateContext(window);
         SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -83,10 +136,10 @@ int GUI::initializeGUI()
         this->done = false;
 }
 
-int GUI::getVal()
-{
-    return this->val;
-}
+//int GUI::getVal()
+//{
+//    return this->minDisp;
+//}
 
 void GUI::killGUI()
 {
@@ -105,6 +158,8 @@ void GUI::updateGUI()
     // GUI UPDATE
     SDL_Event event;
 
+    this->updated = false;
+
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL2_ProcessEvent(&event);
@@ -114,46 +169,72 @@ void GUI::updateGUI()
             this->done = true;
     }
 
-    // Start the Dear ImGui frame
+    // Start the Dear preFilterCapImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame(this->window);
     ImGui::NewFrame();
 
-    static int prev_state = 0;
+    // ------------------------------
 
-    // ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+//    static int prev_state = 0;
 
-    // ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-    // ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-    // ImGui::Checkbox("Another Window", &show_another_window);
+    this->updated |= ImGui::SliderInt("MinDisparity", &this->minDisparity, 0, 20);
 
-    // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-    // ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+//    if (ImGui::IsItemActive() == 0 && prev_state == 1)
+//        this->updated = true;
 
-    // if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-    //     counter++;
-    // ImGui::SameLine();
-    // ImGui::Text("counter = %d", counter);
+//    if(ImGui::IsItemActive())
+//        this->updated = true;
 
-    // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    // ImGui::End();
+//    prev_state_1 = ImGui::IsItemActive();
+
+    this->updated |= ImGui::RadioButton("96", &this->numberOfDisparities, 96); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128);ImGui::SameLine();
+    ImGui::Text("numberOfDisparities");
 
 
-    // ImGui::Text("Hello, world %d", 123);
-    // if (ImGui::Button("Save"))
-    // {
-    //     // do stuff
-    // }
-    // ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
-    ImGui::SliderInt("speckleWin", &this->val, 0, 20);
+    this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
 
-    if (ImGui::IsItemActive() == 0 && prev_state == 1)
-    {
-        this->updated = true;
-        std::cout << "Released" << std::endl;
-    }
+//    if (ImGui::IsItemActive() == 0 && prev_state == 1)
+//        this->updated = true;
 
-    prev_state = ImGui::IsItemActive();
+//    if(ImGui::IsItemActive())
+//        this->updated = true;
+
+
+//    prev_state_2 = ImGui::IsItemActive();
+
+    this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 20);
+
+    this->updated |= ImGui::SliderInt("preFilterCap", &this->preFilterCap, 0, 100);
+
+    this->updated |= ImGui::SliderInt("uniquenessRatio", &this->uniquenessRatio, 5, 20);
+
+    this->updated |= ImGui::SliderInt("speckleWindowSize", &this->speckleWindowSize, 0, 200);
+
+    this->updated |= ImGui::SliderInt("speckleRange", &this->speckleRange, 1, 16);
+
+    this->updated |= ImGui::SliderFloat("sigmaColorBLF", &this->sigmaColorBLF, 1.0f, 20.0f, "%.2f");
+
+    this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
+
+//    this->updated |= ImGui::SliderScalarN("sigmaColorBLF", ImGuiDataType_Double, (void*)&this->sigmaColorBLF, 100, 1.0f, 20.0f, "%.2f");
+
+//    this->updated |= ImGui::SliderScalarN("sigmaSpaceBLF", ImGuiDataType_Double, (void*)&this->sigmaSpaceBLF, 100, 1.0f, 20.0f, "%.2f");
+
+//    **** this->minDisparity = minDisparity;
+//    *** this->numberOfDisparities = numberOfDisparities;
+//    *** this->SADWindowSize = SADWindowSize;
+//    *** this->disp12MaxDiff = disp12MaxDiff;
+//    *** this->preFilterCap = preFilterCap;
+//    ** this->uniquenessRatio = uniquenessRatio;
+//    this->speckleWindowSize = speckleWindowSize;
+//    this->speckleRange = speckleRange;
+//    this->sigmaColorBLF = sigmaColorBLF;
+//    this->sigmaSpaceBLF = sigmaSpaceBLF;
+
+    // ------------------------------
+
 
         // std::cout << "Return Value:" << r << std::endl;
         // std::cout << "IsActive:" << ImGui::IsItemActive() << std::endl;
@@ -167,6 +248,23 @@ void GUI::updateGUI()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SDL_GL_SwapWindow(this->window);
 
+}
+
+void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                    int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                    int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                    double& sigmaSpaceBLF)
+{
+    minDisparity = this->minDisparity;
+    numberOfDisparities = this->numberOfDisparities;
+    SADWindowSize = this->SADWindowSize;
+    disp12MaxDiff = this->disp12MaxDiff;
+    preFilterCap = this->preFilterCap;
+    uniquenessRatio = this->uniquenessRatio;
+    speckleWindowSize = this->speckleWindowSize;
+    speckleRange = this->speckleRange;
+    sigmaColorBLF = this->sigmaColorBLF;
+    sigmaSpaceBLF = this->sigmaSpaceBLF;
 }
 
 bool GUI::isDone()

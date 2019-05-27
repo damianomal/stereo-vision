@@ -94,12 +94,19 @@ bool DispModule::configure(ResourceFinder & rf)
     this->doBLF = !rf.check("skipBLF");
     this->debugWindow = !rf.check("debug");
 
-    if(this->debugWindow)
-        this->gui.initializeGUI();
-
     cout << " Bilateral filter set to " << doBLF << endl;
     this->sigmaColorBLF = 10.0;
     this->sigmaSpaceBLF = 10.0;
+
+    if(this->debugWindow)
+    {
+        this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
+                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
+                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
+                            this->sigmaSpaceBLF);
+//        this->gui.initializeGUI();
+    }
+
 
     this->HL_root=Mat::zeros(4,4,CV_64F);
     this->HR_root=Mat::zeros(4,4,CV_64F);
@@ -134,7 +141,7 @@ bool DispModule::configure(ResourceFinder & rf)
     {
         string fakeEyes=rf.check("fakeEyesPort",Value("/fakeEyes:i")).asString();
 
-        fakeEkesPort.open(fakeEyes);
+//        fakeEkesPort.open(fakeEyes);
 //        =rf.check("rightPort",Value("/right:i")).asString();
     }
     else
@@ -273,7 +280,6 @@ bool DispModule::close()
     return true;
 }
 
-
 /******************************************************************************/
 bool DispModule::updateModule()
 {
@@ -360,7 +366,11 @@ bool DispModule::updateModule()
         std::cout << "Updating..." << std::endl;
 
         this->mutexDisp.lock();
-        this->disp12MaxDiff=this->gui.getVal();
+
+        this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
+                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
+                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF);
+
         this->mutexDisp.unlock();
         this->gui.setUpdated(false);
     }
@@ -370,7 +380,6 @@ bool DispModule::updateModule()
             this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
             this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
     mutexDisp.unlock();
-
 
     if (outDisp.getOutputCount()>0)
     {

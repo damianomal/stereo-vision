@@ -37,6 +37,18 @@ private:
     int val;
     bool updated;
 
+    int uniquenessRatio;
+    int speckleWindowSize;
+    int speckleRange;
+    int numberOfDisparities;
+    int SADWindowSize;
+    int minDisparity;
+    int preFilterCap;
+    int disp12MaxDiff;
+    float sigmaColorBLF;
+    float sigmaSpaceBLF;
+
+
 public:
 
 
@@ -44,9 +56,17 @@ public:
     GUI();
     ~GUI();
     int initializeGUI();
+    int initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowSize,
+                                             int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
+                                             int speckleWindowSize, int speckleRange, double sigmaColorBLF,
+                                             double sigmaSpaceBLF);
     void updateGUI();
     void setVal(int);
     int getVal();
+    void getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                   int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                   int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                   double& sigmaSpaceBLF);
     bool isDone();
     bool isUpdated();
     void setUpdated(bool);

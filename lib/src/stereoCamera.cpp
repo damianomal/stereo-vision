@@ -591,7 +591,7 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 
         if (success)
         {
-//            std::cout << numberOfDisparities << std::endl;
+            std::cout << numberOfDisparities << std::endl;
 
             map = disp * (255.0 / numberOfDisparities);
             //threshold(map, map, 0, 255.0, THRESH_TOZERO);
@@ -599,7 +599,7 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
     } else
     {
         int cn=this->imleft.channels();
-//    #ifdef OPENCV_GREATER_2
+    #ifdef OPENCV_GREATER_2
         Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
                                                     8*cn*SADWindowSize*SADWindowSize,
                                                     32*cn*SADWindowSize*SADWindowSize,
@@ -610,22 +610,22 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 //        std::cout << "RUNNING SGBM" << std::endl;
 
         sgbm->compute(img1r, img2r, disp);
-//    #else
-//        StereoSGBM sgbm;
-//        sgbm.preFilterCap =         preFilterCap; //63
-//        sgbm.SADWindowSize =        SADWindowSize;
-//        sgbm.P1 =                   8*cn*SADWindowSize*SADWindowSize;
-//        sgbm.P2 =                   32*cn*SADWindowSize*SADWindowSize;
-//        sgbm.minDisparity =         minDisparity; //-15
-//        sgbm.numberOfDisparities =  numberOfDisparities;
-//        sgbm.uniquenessRatio =      uniquenessRatio; //22
-//        sgbm.speckleWindowSize =    speckleWindowSize; //100
-//        sgbm.speckleRange =         speckleRange; //32
-//        sgbm.disp12MaxDiff =        disp12MaxDiff;
-//        sgbm.fullDP =               best; // alg == STEREO_HH
+    #else
+        StereoSGBM sgbm;
+        sgbm.preFilterCap =         preFilterCap; //63
+        sgbm.SADWindowSize =        SADWindowSize;
+        sgbm.P1 =                   8*cn*SADWindowSize*SADWindowSize;
+        sgbm.P2 =                   32*cn*SADWindowSize*SADWindowSize;
+        sgbm.minDisparity =         minDisparity; //-15
+        sgbm.numberOfDisparities =  numberOfDisparities;
+        sgbm.uniquenessRatio =      uniquenessRatio; //22
+        sgbm.speckleWindowSize =    speckleWindowSize; //100
+        sgbm.speckleRange =         speckleRange; //32
+        sgbm.disp12MaxDiff =        disp12MaxDiff;
+        sgbm.fullDP =               best; // alg == STEREO_HH
 
-//        sgbm(img1r, img2r, disp);
-//    #endif
+        sgbm(img1r, img2r, disp);
+    #endif
 
         disp.convertTo(map, CV_32FC1, 1.0,0.0);
         map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
