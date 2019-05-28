@@ -50,7 +50,7 @@ bool GUI::isUpdated()
 int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowSize,
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                        int speckleWindowSize, int speckleRange, double sigmaColorBLF,
-                       double sigmaSpaceBLF)
+                       double sigmaSpaceBLF, double wls_lambda, double wls_sigma)
 {
 
     this->minDisparity = minDisparity;
@@ -63,6 +63,8 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
     this->speckleRange = speckleRange;
     this->sigmaColorBLF = sigmaColorBLF;
     this->sigmaSpaceBLF = sigmaSpaceBLF;
+    this->wls_lambda = wls_lambda;
+    this->wls_sigma = wls_sigma;
 
     return GUI::initializeGUI();
 }
@@ -97,7 +99,7 @@ int GUI::initializeGUI()
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        this->window = SDL_CreateWindow("SGBM parameters", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 300, window_flags);
+        this->window = SDL_CreateWindow("SGBM parameters", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 350, window_flags);
         this->gl_context = SDL_GL_CreateContext(window);
         SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -200,6 +202,10 @@ void GUI::updateGUI()
 
     this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
 
+    this->updated |= ImGui::InputFloat("WLS lambda", &this->wls_lambda, 1, 100, "%.1f");
+
+    this->updated |= ImGui::InputFloat("WLS sigma", &this->wls_sigma, 0.01f, 0.1f, "%.2f");
+
     this->recalibrate = ImGui::Button("Recalibrate");
 
     this->updated |= this->recalibrate;
@@ -220,7 +226,7 @@ void GUI::updateGUI()
 void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                     int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                     int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-                    double& sigmaSpaceBLF)
+                    double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma)
 {
     minDisparity = this->minDisparity;
     numberOfDisparities = this->numberOfDisparities;
@@ -232,6 +238,8 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     speckleRange = this->speckleRange;
     sigmaColorBLF = this->sigmaColorBLF;
     sigmaSpaceBLF = this->sigmaSpaceBLF;
+    wls_lambda = this->wls_lambda;
+    wls_sigma = this->wls_sigma;
 }
 
 bool GUI::isDone()

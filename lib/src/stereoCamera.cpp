@@ -26,6 +26,26 @@
 
 #include "iCub/stereoVision/stereoCamera.h"
 
+// --- DEBUG
+#include <chrono>
+#define PROF_S {start = std::chrono::high_resolution_clock::now();}
+#define PROF_E {stop = std::chrono::high_resolution_clock::now();}
+#define PROF_D(N) {duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); this->debug_timings[N] += duration.count();}
+
+char const *debug_strings_stereo[] = {
+    "stereoRectify",
+    "initUndistortRectifyMapx2",
+    "remapx2",
+    "compute_disparity",
+    "disp map post-proc"
+};
+
+
+
+
+
+
+
 Mat StereoCamera::buildRotTras(Mat &R, Mat &T) {
     Mat A = Mat::eye(4, 4, CV_64F);
     for(int i = 0; i < R.rows; i++)
@@ -70,6 +90,11 @@ StereoCamera::StereoCamera(bool rectify) {
 #endif 
 
     use_elas = false;
+
+    this->debug_count = 0;
+
+    for(int i = 0; i < 10; i++)
+        this->debug_timings[i] = 0;
 }
 
 StereoCamera::StereoCamera(yarp::os::ResourceFinder &rf, bool rectify) {
@@ -90,6 +115,11 @@ StereoCamera::StereoCamera(yarp::os::ResourceFinder &rf, bool rectify) {
 #endif 
 
     use_elas = false;
+
+    this->debug_count = 0;
+
+    for(int i = 0; i < 10; i++)
+        this->debug_timings[i] = 0;
 }
 
 StereoCamera::StereoCamera(Camera Left, Camera Right,bool rectify) {
@@ -109,6 +139,11 @@ StereoCamera::StereoCamera(Camera Left, Camera Right,bool rectify) {
 #endif 
 
     use_elas = false;
+
+    this->debug_count = 0;
+
+    for(int i = 0; i < 10; i++)
+        this->debug_timings[i] = 0;
 }
 
 void StereoCamera::initELAS(yarp::os::ResourceFinder &rf)
@@ -537,9 +572,17 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         return;
     }
 
+    //DEBUG
+    auto start = std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
+
     Size img_size=this->imleft.size();
 
 //    std::cout << "BEFORE IF CAMERACHANGED" << std::endl;
+
+    PROF_S
 
     if (cameraChanged)
     {
@@ -558,7 +601,12 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         mutex->post();
     }
 
+    PROF_E
+    PROF_D(0)
+
 //    std::cout << "BEFORE IF CAMERACHANGED2" << std::endl;
+
+    PROF_S
 
     if (cameraChanged)
     {
@@ -568,9 +616,19 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
                 img_size, CV_32FC1, this->map21, this->map22);
     }
 
+    PROF_E
+    PROF_D(1)
+
+    PROF_S
+
     Mat img1r, img2r;
     remap(this->imleft, img1r, this->map11, this->map12, cv::INTER_LINEAR);
     remap(this->imright, img2r, this->map21,this->map22, cv::INTER_LINEAR);
+
+    PROF_E
+    PROF_D(2)
+
+
 
     imgLeftRect = img1r;
     imgRightRect = img2r;
@@ -580,6 +638,8 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
     bool success;
 
 //    std::cout << "BEFORE IF USEELAS" << std::endl;
+
+    PROF_S
 
     if (use_elas)
     {
@@ -634,6 +694,11 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
         success = true;
     }
 
+    PROF_E
+    PROF_D(3)
+
+    PROF_S
+
     if (success)
     {
         if (cameraChanged)
@@ -678,6 +743,25 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
             disp.convertTo(disp, CV_16SC1, 16.0);
     }
 
+    PROF_E
+    PROF_D(4)
+
+    debug_count++;
+
+    if(debug_count == 100)
+    {
+
+        std::cout << std::endl << "---- STEREOCAM: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
+
+        for(int i = 0; i < 4; i++)
+        {
+            std::cout << debug_strings_stereo[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
+            this->debug_timings[i] = 0;
+        }
+
+        debug_count = 0;
+    }
+
     this->mutex->wait();
 
     this->Disparity = disp8;
@@ -685,6 +769,238 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 
     this->mutex->post();
 
+}
+
+Rect computeROI(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
+
+
+Rect computeROI(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
+{
+    int min_disparity = matcher_instance->getMinDisparity();
+    int num_disparities = matcher_instance->getNumDisparities();
+    int block_size = matcher_instance->getBlockSize();
+
+    int bs2 = block_size/2;
+    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
+
+    int xmin = maxD + bs2;
+    int xmax = src_sz.width + minD - bs2;
+    int ymin = bs2;
+    int ymax = src_sz.height - bs2;
+
+    Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
+    std::cout << "roi:" << r << std::endl;
+    return r;
+}
+
+cv::Mat StereoCamera::computeDisparity_filt(bool best, int uniquenessRatio, int speckleWindowSize,
+        int speckleRange, int numberOfDisparities, int SADWindowSize,
+        int minDisparity, int preFilterCap, int disp12MaxDiff, double wls_lambda, double wls_sigma)
+{
+
+//    std::cout << "COMPUTE DISPARITY" << std::endl;
+
+//    if (this->Kleft.empty() || this->DistL.empty() || this->Kright.empty() || this->DistR.empty())
+//    {
+//        cout <<" Cameras are not calibrated! Run the Calibration first!" << endl;
+//        return;
+//    }
+
+//    if (this->imleft.empty() || this->imright.empty())
+//    {
+//        cout << "Images are not set! set the images first!" << endl;
+//        return;
+//    }
+
+    //DEBUG
+    auto start = std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
+
+    Size img_size=this->imleft.size();
+
+//    std::cout << "BEFORE IF CAMERACHANGED" << std::endl;
+
+    PROF_S
+
+    if (cameraChanged)
+    {
+        mutex->wait();
+        stereoRectify(this->Kleft, this->DistL, this->Kright, this->DistR, img_size,
+                this->R, this->T, this->RLrect, this->RRrect, this->PLrect,
+                this->PRrect, this->Q, -1);
+
+        if (!rectify)
+        {
+            this->RLrect=Mat::eye(3,3,CV_32FC1);
+            this->RRrect=Mat::eye(3,3,CV_32FC1);
+            this->PLrect=this->Kleft;
+            this->PRrect=this->Kright;
+        }
+        mutex->post();
+    }
+
+    PROF_E
+    PROF_D(0)
+
+//    std::cout << "BEFORE IF CAMERACHANGED2" << std::endl;
+
+    PROF_S
+
+    if (cameraChanged)
+    {
+        initUndistortRectifyMap(this->Kleft, this->DistL, this->RLrect, this->PLrect,
+                img_size, CV_32FC1, this->map11, this->map12);
+        initUndistortRectifyMap(this->Kright,  this->DistR, this->RRrect, this->PRrect,
+                img_size, CV_32FC1, this->map21, this->map22);
+    }
+
+    PROF_E
+    PROF_D(1)
+
+    PROF_S
+
+    Mat img1r, img2r;
+    remap(this->imleft, img1r, this->map11, this->map12, cv::INTER_LINEAR);
+    remap(this->imright, img2r, this->map21,this->map22, cv::INTER_LINEAR);
+
+    PROF_E
+    PROF_D(2)
+
+
+
+    imgLeftRect = img1r;
+    imgRightRect = img2r;
+
+//    Mat disp,disp8,map;
+
+    bool success;
+
+//    std::cout << "BEFORE IF USEELAS" << std::endl;
+
+    PROF_S
+
+    int cn=this->imleft.channels();
+
+    Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
+                                                8*cn*SADWindowSize*SADWindowSize,
+                                                32*cn*SADWindowSize*SADWindowSize,
+                                                disp12MaxDiff,preFilterCap,uniquenessRatio,
+                                                speckleWindowSize,speckleRange,
+                                                best?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+
+    Mat left_disp,right_disp, filtered_disp, map;
+
+//        std::cout << "RUNNING SGBM" << std::endl;
+
+    sgbm->compute(img1r, img2r, left_disp);
+
+//    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(sgbm);
+//    Ptr<StereoMatcher> right_matcher = createRightMatcher(sgbm);
+//    right_matcher->compute(img1r, img2r, right_disp);
+
+//    wls_filter->setLambda(wls_lambda);
+//    wls_filter->setSigmaColor(wls_sigma);
+
+//    wls_filter->filter(left_disp,img1r,filtered_disp,right_disp);
+
+
+    Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
+    wls_filter->setLambda(wls_lambda);
+    wls_filter->setSigmaColor(wls_sigma);
+    Rect ROI = computeROI(img1r.size(),sgbm);
+    wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*SADWindowSize));
+    wls_filter->filter(left_disp,img1r,filtered_disp,Mat(),ROI);
+
+
+    getDisparityVis(filtered_disp, map, 4);
+
+
+//    disp.convertTo(map, CV_32FC1, 1.0,0.0);
+//    map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
+    //normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+
+    success = true;
+
+
+    PROF_E
+    PROF_D(3)
+
+//    PROF_S
+
+//    if (success)
+//    {
+//        if (cameraChanged)
+//        {
+//            this->mutex->wait();
+
+//            Mat inverseMapL(map.rows*map.cols,1,CV_32FC2);
+//            Mat inverseMapR(map.rows*map.cols,1,CV_32FC2);
+
+//            for (int y=0; y<map.rows; y++)
+//            {
+//                for (int x=0; x<map.cols; x++)
+//                {
+//                    inverseMapL.ptr<float>(y*map.cols+x)[0]=(float)x;
+//                    inverseMapL.ptr<float>(y*map.cols+x)[1]=(float)y;
+//                    inverseMapR.ptr<float>(y*map.cols+x)[0]=(float)x;
+//                    inverseMapR.ptr<float>(y*map.cols+x)[1]=(float)y;
+//                }
+//            }
+
+//            undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
+//            undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
+
+//            Mat mapperL=inverseMapL.reshape(2,map.rows);
+//            Mat mapperR=inverseMapR.reshape(2,map.rows);
+//            this->MapperL=mapperL;
+//            this->MapperR=mapperR;
+
+//            this->mutex->post();
+
+//            cameraChanged = false;
+//        }
+
+//        Mat x;
+//        remap(map,dispTemp,this->MapperL,x,cv::INTER_LINEAR);
+//        dispTemp.convertTo(disp8,CV_8U);
+
+////        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
+////        std::cout << disp.size() << std::endl;
+
+//        if (use_elas)
+//            disp.convertTo(disp, CV_16SC1, 16.0);
+//    }
+
+//    PROF_E
+//    PROF_D(4)
+
+//    debug_count++;
+
+    if(debug_count == 100)
+    {
+
+        std::cout << std::endl << "---- STEREOCAM: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
+
+        for(int i = 0; i < 4; i++)
+        {
+            std::cout << debug_strings_stereo[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
+            this->debug_timings[i] = 0;
+        }
+
+        debug_count = 0;
+    }
+
+//    this->mutex->wait();
+
+//    this->Disparity = disp8;
+//    this->Disparity16 = disp;
+
+//    this->mutex->post();
+
+    return map;
 }
 
 

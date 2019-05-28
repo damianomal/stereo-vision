@@ -20,12 +20,24 @@
 #include <algorithm>
 #include <yarp/cv/Cv.h>
 #include "DispModule.h"
-#include <chrono>
 
 // --- DEBUG
+#include <chrono>
 #define PROF_S {start = std::chrono::high_resolution_clock::now();}
 #define PROF_E {stop = std::chrono::high_resolution_clock::now();}
 #define PROF_D(N) {duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); this->debug_timings[N] += duration.count();}
+
+char const *debug_strings[] = {
+    "updateViaKinematics",
+    "updateViaGazeCtrl",
+    "getCameraHGazeCtrlx2",
+    "gui.recalibrate",
+    "doSFM",
+    "gui.isUpdated",
+    "computeDisparity",
+    "bilateralFilter",
+    "depth computation"
+};
 
 
 using namespace yarp::cv;
@@ -87,30 +99,20 @@ bool DispModule::configure(ResourceFinder & rf)
 
     stereo->setIntrinsics(KL,KR,DistL,DistR);
 
-    this->useBestDisp=true;
-    this->uniquenessRatio=15;
-    this->speckleWindowSize=50;
-    this->speckleRange=16;
-    this->SADWindowSize=7;
-    this->minDisparity=0;
-    this->preFilterCap=63;
-    this->disp12MaxDiff=0;
-
-    this->numberOfDisparities = 96;
+    this->initializeStereoParams();
 
     this->doBLF = !rf.check("skipBLF");
-    this->debugWindow = !rf.check("debug");
 
     cout << " Bilateral filter set to " << doBLF << endl;
-    this->sigmaColorBLF = 10.0;
-    this->sigmaSpaceBLF = 10.0;
+
+    this->debugWindow = !rf.check("debug");
 
     if(this->debugWindow)
     {
         this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
-                            this->sigmaSpaceBLF);
+                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma);
 //        this->gui.initializeGUI();
     }
 
@@ -192,6 +194,44 @@ bool DispModule::configure(ResourceFinder & rf)
         this->debug_timings[i] = 0;
 
     return true;
+
+}
+
+cv::Mat DispModule::depthFromDisparity(Mat disp, float f, int numDisp)
+{
+    yarp::sig::Vector xL, xR;
+    yarp::sig::Vector o_temp;
+
+    bool check = igaze->getLeftEyePose(xL, o_temp);
+    check &= igaze->getRightEyePose(xR, o_temp);
+
+    float baseline = norm(xL-xR);
+
+    cv::Mat depth;
+
+    disp.convertTo(depth, CV_32FC1);
+
+    return (f * baseline) / (depth * disp.cols);
+}
+
+void DispModule::initializeStereoParams()
+{
+    this->useBestDisp=true;
+    this->uniquenessRatio=15;
+    this->speckleWindowSize=50;
+    this->speckleRange=16;
+    this->SADWindowSize=7;
+    this->minDisparity=0;
+    this->preFilterCap=63;
+    this->disp12MaxDiff=0;
+
+    this->numberOfDisparities = 96;
+
+    this->sigmaColorBLF = 10.0;
+    this->sigmaSpaceBLF = 10.0;
+
+    this->wls_lambda = 8000.;
+    this->wls_sigma = 1.5;
 
 }
 
@@ -302,6 +342,9 @@ bool DispModule::updateModule()
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
+
+    std::cout << std::setprecision(2) << std::fixed;
+
     if(this->usePorts)
     {
         // code to read from fakeEyes port
@@ -336,6 +379,21 @@ bool DispModule::updateModule()
 
     leftMat=toCvMat(*yarp_imgL);
     rightMat=toCvMat(*yarp_imgR);
+
+    //DEBUG
+
+    this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+                                                8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+                                                32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+                                                this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+                                                this->speckleWindowSize,this->speckleRange,
+                                                this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+    wls_filter = createDisparityWLSFilter(this->sgbm_temp);
+
+    wls_filter->setLambda(8000.0);
+    wls_filter->setSigmaColor(1.5);
+
 
     // TODO: this part has been commented since the resolution of the
     // cameras can be forced at execution time, thus, it is not needed
@@ -432,7 +490,22 @@ bool DispModule::updateModule()
 
         this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
-                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF);
+                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
+                            this->wls_lambda, this->wls_sigma);
+
+        this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+                                                    8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+                                                    32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+                                                    this->speckleWindowSize,this->speckleRange,
+                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+        wls_filter = createDisparityWLSFilter(this->sgbm_temp);
+
+        wls_filter->setLambda(8000.0);
+        wls_filter->setSigmaColor(1.5);
+
+        right_matcher = createRightMatcher(sgbm_temp);
 
         this->mutexDisp.unlock();
         this->gui.setUpdated(false);
@@ -443,50 +516,88 @@ bool DispModule::updateModule()
 
     PROF_S
 
-    mutexDisp.lock();
+//    mutexDisp.lock();
 
-    this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-                this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-                this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+//    this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+//                this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+//                this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
 
-    mutexDisp.unlock();
+//    mutexDisp.unlock();
 
     PROF_E
     PROF_D(6)
 
     PROF_S
 
-    if (outDisp.getOutputCount()>0)
-    {
-        outputDm = stereo->getDisparity();
+//    if (outDisp.getOutputCount()>0)
+//    {
+//        outputDm = stereo->getDisparity();
 
-        if (!outputDm.empty())
+//        if (!outputDm.empty())
+//        {
+//            ImageOf<PixelMono> &outim = outDisp.prepare();
+//            Mat outimMat;
+//            if (doBLF)
+//            {
+//                Mat outputDfiltm;
+//                cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
+//                outimMat = outputDfiltm;
+//            }
+//            else
+//            {
+//                outimMat = outputDm;
+//            }
+//            outim = fromCvMat<PixelMono>(outimMat);
+//            outDisp.write();
+//        }
+//    }
+
+        if (outDisp.getOutputCount()>0)
         {
+            mutexDisp.lock();
+
+            outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+                                                     this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                                                     this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
+                                                     this->wls_lambda, this->wls_sigma);
+
+            mutexDisp.unlock();
+
+//            double min, max;
+//                cv::minMaxLoc(outputDm, &min, &max);
+
+//                std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
+
+
             ImageOf<PixelMono> &outim = outDisp.prepare();
-            Mat outimMat;
-            if (doBLF)
-            {
-                Mat outputDfiltm;
-                cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
-                outimMat = outputDfiltm;
-            }
-            else
-            {
-                outimMat = outputDm;
-            }
-            outim = fromCvMat<PixelMono>(outimMat);
+            outim = fromCvMat<PixelMono>(outputDm);
             outDisp.write();
         }
-    }
 
     PROF_E
     PROF_D(7)
 
+    PROF_S
+
     if (outDepth.getOutputCount()>0)
     {
-        // to write
-        outDepth.write();
+        outputDepth = this->depthFromDisparity(outputDm, 234.5, this->numberOfDisparities);
+
+        if (!outputDepth.empty())
+        {
+            ImageOf<PixelMono> &outim = outDepth.prepare();
+            outim = fromCvMat<PixelMono>(outputDepth);
+            outDepth.write();
+        }
     }
+
+    PROF_E
+    PROF_D(8)
+
+//    double min, max;
+//    cv::minMaxLoc(outputDm, &min, &max);
+
+//    std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
 
     if(this->debugWindow)
         this->gui.updateGUI();
@@ -498,30 +609,15 @@ bool DispModule::updateModule()
 
     if(debug_count == 100)
     {
-//        std::cout << std::endl << "---- AVERAGE TIMING OVER 100 FRAMES ----" << std::endl;
-//        std::cout << "updateViaKinematics: " << this->debug_timings[0] / debug_count << " micros" << std::endl;
-//        std::cout << "updateViaGazeCtrl: " << this->debug_timings[1] / debug_count << " micros" << std::endl;
-//        std::cout << "getCameraHGazeCtrlx2: " << this->debug_timings[2] / debug_count << " micros" << std::endl;
-//        std::cout << "gui.recalibrate: " << this->debug_timings[3] / debug_count << " micros" << std::endl;
-//        std::cout << "doSFM: " << this->debug_timings[4] / debug_count << " micros" << std::endl;
-//        std::cout << "gui.isUpdated: " << this->debug_timings[5] / debug_count << " micros" << std::endl;
-//        std::cout << "computeDisparity: " << this->debug_timings[6] / debug_count << " micros" << std::endl;
 
+        std::cout << std::endl << "---- DISPMODULE: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
 
-        std::cout << std::endl << "---- AVERAGE TIMING OVER 100 FRAMES ----" << std::endl;
-        std::cout << "updateViaKinematics: " << (this->debug_timings[0] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "updateViaGazeCtrl: " << (this->debug_timings[1] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "getCameraHGazeCtrlx2: " << (this->debug_timings[2] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "gui.recalibrate: " << (this->debug_timings[3] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "doSFM: " << (this->debug_timings[4] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "gui.isUpdated: " << (this->debug_timings[5] / debug_count) / 1000 << " ms" << std::endl;
-        std::cout << "computeDisparity: " << (this->debug_timings[6] / debug_count) / 1000 << " ms" << std::endl;
-
-        for(int i = 0; i < 7; i++)
+        for(int i = 0; i < 9; i++)
+        {
+            std::cout << debug_strings[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
             this->debug_timings[i] = 0;
+        }
 
-        //         std::cout << "" << this->debug_timings[7] << "micros" << std::endl;
-//         std::cout << "" << this->debug_timings[8] << "micros" << std::endl;
         debug_count = 0;
     }
 

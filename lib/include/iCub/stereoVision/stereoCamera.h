@@ -46,6 +46,10 @@
 
 #include <yarp/os/all.h>
 
+#include "opencv2/ximgproc/disparity_filter.hpp"
+using namespace cv::ximgproc;
+
+
 #define LEFT    0
 #define RIGHT   1
 
@@ -158,8 +162,15 @@ private:
     bool loadStereoParameters(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL, Mat &DistR, Mat &Ro, Mat &T);
     void updateExpectedCameraMatrices();
 
+
+
     bool use_elas;
     elasWrapper*  elaswrap;
+
+    // DEBUG
+    int debug_timings[10];
+    int debug_count;
+
 
 public:
 
@@ -572,4 +583,8 @@ public:
     * @return the pixel position in the non-rectified image.
     */
     Point2f fromRectifiedToOriginal(int u, int v, int camera);
+
+
+    cv::Mat computeDisparity_filt(bool best=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0, double wls_lambda=8000., double wls_sigma=1.5);
+
 };

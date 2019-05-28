@@ -48,6 +48,8 @@ private:
     int disp12MaxDiff;
     float sigmaColorBLF;
     float sigmaSpaceBLF;
+    float wls_lambda;
+    float wls_sigma;
 
 
 public:
@@ -60,14 +62,14 @@ public:
     int initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowSize,
                                              int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                                              int speckleWindowSize, int speckleRange, double sigmaColorBLF,
-                                             double sigmaSpaceBLF);
+                                             double sigmaSpaceBLF, double wls_lambda, double wls_sigma);
     void updateGUI();
     void setVal(int);
     int getVal();
     void getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                    int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                    int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-                   double& sigmaSpaceBLF);
+                   double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma);
     bool isDone();
     bool isUpdated();
     void setUpdated(bool);

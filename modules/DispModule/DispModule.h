@@ -245,6 +245,9 @@ against OpenCV versions: 2.4.
 #include <iCub/iKin/iKinFwd.h>
 #include <iCub/stereoVision/stereoCamera.h>
 
+
+#include "opencv2/ximgproc/disparity_filter.hpp"
+
 #include "fastBilateral.hpp"
 
 #include "gui.h"
@@ -264,10 +267,13 @@ using namespace yarp::math;
 using namespace iCub::ctrl;
 using namespace iCub::iKin;
 
+using namespace cv::ximgproc;
+
+
 class DispModule: public yarp::os::RFModule
 {
     StereoCamera* stereo;
-    Mat           outputDm;
+    Mat           outputDm, outputDepth;
     Mat leftMat, rightMat;
 
 #ifdef USING_GPU
@@ -305,6 +311,8 @@ class DispModule: public yarp::os::RFModule
     bool debugWindow;
     double sigmaColorBLF;
     double sigmaSpaceBLF;
+    double wls_lambda;
+    double wls_sigma;
     bool doBLF;
     bool usePorts;
     yarp::os::Mutex mutexRecalibration;
@@ -315,6 +323,9 @@ class DispModule: public yarp::os::RFModule
     int debug_timings[10];
     int debug_count;
 
+    Ptr<StereoSGBM> sgbm_temp;
+    Ptr<DisparityWLSFilter> wls_filter;
+    Ptr<StereoMatcher> right_matcher;
 
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
@@ -336,6 +347,11 @@ class DispModule: public yarp::os::RFModule
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
     void updateViaGazeCtrl(const bool update);
     void updateViaKinematics(const yarp::sig::Vector& deyes);
+
+    void initializeStereoParams();
+
+    Mat depthFromDisparity(Mat disp, float f, int numDisp);
+
 
     GUI gui;
 
