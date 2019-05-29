@@ -35,7 +35,7 @@ char const *debug_strings[] = {
     "doSFM",
     "gui.isUpdated",
     "computeDisparity",
-    "bilateralFilter",
+    "output+bilateralFilter",
     "depth computation"
 };
 
@@ -107,12 +107,18 @@ bool DispModule::configure(ResourceFinder & rf)
 
     this->debugWindow = !rf.check("debug");
 
+    this->useWLSfiltering = rf.check("wls");
+
+    cout << " WLS filtering set to " << this->useWLSfiltering << endl;
+
+
     if(this->debugWindow)
     {
         this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
-                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma);
+                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
+                            this->useWLSfiltering, this->doBLF);
 //        this->gui.initializeGUI();
     }
 
@@ -486,28 +492,30 @@ bool DispModule::updateModule()
     PROF_S
     if(this->gui.isUpdated())
     {
-        this->mutexDisp.lock();
+//        this->mutexDisp.lock();
 
         this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
-                            this->wls_lambda, this->wls_sigma);
+                            this->wls_lambda, this->wls_sigma, this->useWLSfiltering, this->doBLF);
 
-        this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-                                                    8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-                                                    32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-                                                    this->speckleWindowSize,this->speckleRange,
-                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
-        wls_filter = createDisparityWLSFilter(this->sgbm_temp);
 
-        wls_filter->setLambda(8000.0);
-        wls_filter->setSigmaColor(1.5);
+//        this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+//                                                    8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+//                                                    32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+//                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+//                                                    this->speckleWindowSize,this->speckleRange,
+//                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
-        right_matcher = createRightMatcher(sgbm_temp);
+//        wls_filter = createDisparityWLSFilter(this->sgbm_temp);
 
-        this->mutexDisp.unlock();
+//        wls_filter->setLambda(8000.0);
+//        wls_filter->setSigmaColor(1.5);
+
+//        right_matcher = createRightMatcher(sgbm_temp);
+
+//        this->mutexDisp.unlock();
         this->gui.setUpdated(false);
     }
 
@@ -516,63 +524,82 @@ bool DispModule::updateModule()
 
     PROF_S
 
-//    mutexDisp.lock();
+    if(!this->useWLSfiltering)
+    {
+        mutexDisp.lock();
 
-//    this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-//                this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-//                this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+        this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+                    this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                    this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
 
-//    mutexDisp.unlock();
+        mutexDisp.unlock();
+    }
+    else
+    {
+        outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+                                                 this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                                                 this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
+                                                 this->wls_lambda, this->wls_sigma);
+    }
 
     PROF_E
     PROF_D(6)
 
     PROF_S
 
-//    if (outDisp.getOutputCount()>0)
-//    {
-//        outputDm = stereo->getDisparity();
-
-//        if (!outputDm.empty())
-//        {
-//            ImageOf<PixelMono> &outim = outDisp.prepare();
-//            Mat outimMat;
-//            if (doBLF)
-//            {
-//                Mat outputDfiltm;
-//                cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
-//                outimMat = outputDfiltm;
-//            }
-//            else
-//            {
-//                outimMat = outputDm;
-//            }
-//            outim = fromCvMat<PixelMono>(outimMat);
-//            outDisp.write();
-//        }
-//    }
-
-        if (outDisp.getOutputCount()>0)
+    if (outDisp.getOutputCount()>0)
+    {
+        if(!this->useWLSfiltering)
         {
-            mutexDisp.lock();
+            outputDm = stereo->getDisparity();
 
-            outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-                                                     this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-                                                     this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
-                                                     this->wls_lambda, this->wls_sigma);
-
-            mutexDisp.unlock();
-
-//            double min, max;
-//                cv::minMaxLoc(outputDm, &min, &max);
-
-//                std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
-
-
+            if (!outputDm.empty())
+            {
+                ImageOf<PixelMono> &outim = outDisp.prepare();
+                Mat outimMat;
+                if (doBLF)
+                {
+                    Mat outputDfiltm;
+                    cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
+                    outimMat = outputDfiltm;
+                }
+                else
+                {
+                    outimMat = outputDm;
+                }
+                outim = fromCvMat<PixelMono>(outimMat);
+                outDisp.write();
+            }
+        }
+        else
+        {
             ImageOf<PixelMono> &outim = outDisp.prepare();
             outim = fromCvMat<PixelMono>(outputDm);
             outDisp.write();
         }
+    }
+
+//        if (outDisp.getOutputCount()>0)
+//        {
+//            mutexDisp.lock();
+
+//            outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+//                                                     this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+//                                                     this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
+//                                                     this->wls_lambda, this->wls_sigma);
+
+//            mutexDisp.unlock();
+
+////            double min, max;
+////                cv::minMaxLoc(outputDm, &min, &max);
+
+////                std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
+
+
+//            ImageOf<PixelMono> &outim = outDisp.prepare();
+//            outim = fromCvMat<PixelMono>(outputDm);
+//            outDisp.write();
+//        }
 
     PROF_E
     PROF_D(7)

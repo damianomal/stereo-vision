@@ -314,6 +314,7 @@ class DispModule: public yarp::os::RFModule
     double wls_lambda;
     double wls_sigma;
     bool doBLF;
+    bool useWLSfiltering;
     bool usePorts;
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;

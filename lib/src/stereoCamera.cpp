@@ -895,16 +895,18 @@ cv::Mat StereoCamera::computeDisparity_filt(bool best, int uniquenessRatio, int 
 
 //        std::cout << "RUNNING SGBM" << std::endl;
 
+
+
     sgbm->compute(img1r, img2r, left_disp);
 
 //    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(sgbm);
 //    Ptr<StereoMatcher> right_matcher = createRightMatcher(sgbm);
-//    right_matcher->compute(img1r, img2r, right_disp);
-
+//    right_matcher->compute(img2r, img1r, right_disp);
 //    wls_filter->setLambda(wls_lambda);
 //    wls_filter->setSigmaColor(wls_sigma);
-
 //    wls_filter->filter(left_disp,img1r,filtered_disp,right_disp);
+
+
 
 
     Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
@@ -915,7 +917,9 @@ cv::Mat StereoCamera::computeDisparity_filt(bool best, int uniquenessRatio, int 
     wls_filter->filter(left_disp,img1r,filtered_disp,Mat(),ROI);
 
 
-    getDisparityVis(filtered_disp, map, 4);
+
+
+    getDisparityVis(filtered_disp, map, 2);
 
 
 //    disp.convertTo(map, CV_32FC1, 1.0,0.0);

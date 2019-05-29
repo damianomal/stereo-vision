@@ -50,7 +50,8 @@ bool GUI::isUpdated()
 int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowSize,
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                        int speckleWindowSize, int speckleRange, double sigmaColorBLF,
-                       double sigmaSpaceBLF, double wls_lambda, double wls_sigma)
+                       double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
+                       bool useWLS, bool useBLF)
 {
 
     this->minDisparity = minDisparity;
@@ -65,6 +66,8 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
     this->sigmaSpaceBLF = sigmaSpaceBLF;
     this->wls_lambda = wls_lambda;
     this->wls_sigma = wls_sigma;
+    this->useWLS = useWLS;
+    this->useBLF = useBLF;
 
     return GUI::initializeGUI();
 }
@@ -183,7 +186,7 @@ void GUI::updateGUI()
     this->updated |= ImGui::RadioButton("32", &this->numberOfDisparities, 32); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("64", &this->numberOfDisparities, 64); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("96", &this->numberOfDisparities, 96); ImGui::SameLine();
-    this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128);ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128); ImGui::SameLine();
     ImGui::Text("numberOfDisparities");
 
     this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
@@ -202,11 +205,15 @@ void GUI::updateGUI()
 
     this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
 
-    this->updated |= ImGui::InputFloat("WLS lambda", &this->wls_lambda, 1, 100, "%.1f");
+    this->updated |= ImGui::InputFloat("WLS lambda", &this->wls_lambda, 500, 1000, "%.1f");
 
-    this->updated |= ImGui::InputFloat("WLS sigma", &this->wls_sigma, 0.01f, 0.1f, "%.2f");
+    this->updated |= ImGui::InputFloat("WLS sigma", &this->wls_sigma, 0.1f, 0.5f, "%.2f");
 
-    this->recalibrate = ImGui::Button("Recalibrate");
+    this->recalibrate = ImGui::Button("Recalibrate"); ImGui::SameLine();
+
+    this->updated |= ImGui::Checkbox("Use WLS", &this->useWLS);  ImGui::SameLine();
+
+    this->updated |= ImGui::Checkbox("Use BLF", &this->useBLF);
 
     this->updated |= this->recalibrate;
 
@@ -226,7 +233,8 @@ void GUI::updateGUI()
 void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                     int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                     int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-                    double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma)
+                    double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
+                    bool& useWLS, bool& useBLF)
 {
     minDisparity = this->minDisparity;
     numberOfDisparities = this->numberOfDisparities;
@@ -240,6 +248,8 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     sigmaSpaceBLF = this->sigmaSpaceBLF;
     wls_lambda = this->wls_lambda;
     wls_sigma = this->wls_sigma;
+    useWLS = this->useWLS;
+    useBLF = this->useBLF;
 }
 
 bool GUI::isDone()
