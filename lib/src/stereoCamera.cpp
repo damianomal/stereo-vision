@@ -793,7 +793,7 @@ Rect computeROI(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
     return r;
 }
 
-cv::Mat StereoCamera::computeDisparity_filt(bool best, int uniquenessRatio, int speckleWindowSize,
+cv::Mat StereoCamera::computeDisparity_filt(bool best, bool left_right, int uniquenessRatio, int speckleWindowSize,
         int speckleRange, int numberOfDisparities, int SADWindowSize,
         int minDisparity, int preFilterCap, int disp12MaxDiff, double wls_lambda, double wls_sigma)
 {
@@ -891,40 +891,43 @@ cv::Mat StereoCamera::computeDisparity_filt(bool best, int uniquenessRatio, int 
                                                 best?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
 
-    Mat left_disp,right_disp, filtered_disp, map;
+    Mat left_disp, right_disp, map;
 
 //        std::cout << "RUNNING SGBM" << std::endl;
 
-
-
     sgbm->compute(img1r, img2r, left_disp);
 
-//    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(sgbm);
-//    Ptr<StereoMatcher> right_matcher = createRightMatcher(sgbm);
-//    right_matcher->compute(img2r, img1r, right_disp);
-//    wls_filter->setLambda(wls_lambda);
-//    wls_filter->setSigmaColor(wls_sigma);
-//    wls_filter->filter(left_disp,img1r,filtered_disp,right_disp);
+    if(left_right)
+    {
+        Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(sgbm);
+        Ptr<StereoMatcher> right_matcher = createRightMatcher(sgbm);
+        right_matcher->compute(img2r, img1r, right_disp);
+        wls_filter->setLambda(wls_lambda);
+        wls_filter->setSigmaColor(wls_sigma);
 
+        wls_filter->filter(left_disp,img1r,this->filtered_disp,right_disp);
+    }
+    else
+    {
+        Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
+        wls_filter->setLambda(wls_lambda);
+        wls_filter->setSigmaColor(wls_sigma);
+        Rect ROI = computeROI(img1r.size(),sgbm);
+        wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*SADWindowSize));
+        wls_filter->filter(left_disp,img1r,this->filtered_disp,Mat(),ROI);
+    }
 
+//    TODO: Controllare il significato e il valore
+//    di questi due parametri
 
+//    wls_filter->setLRCthresh();
+//    wls_filter->setDepthDiscontinuityRadius();
 
-    Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
-    wls_filter->setLambda(wls_lambda);
-    wls_filter->setSigmaColor(wls_sigma);
-    Rect ROI = computeROI(img1r.size(),sgbm);
-    wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*SADWindowSize));
-    wls_filter->filter(left_disp,img1r,filtered_disp,Mat(),ROI);
+    getDisparityVis(this->filtered_disp, map, 2);
 
-
-
-
-    getDisparityVis(filtered_disp, map, 2);
-
-
-//    disp.convertTo(map, CV_32FC1, 1.0,0.0);
+//    filtered_disp.convertTo(map, CV_32FC1, 1.0,0.0);
 //    map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
-    //normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+//    normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
 
     success = true;
 

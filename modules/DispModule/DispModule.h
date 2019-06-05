@@ -252,6 +252,8 @@ against OpenCV versions: 2.4.
 
 #include "gui.h"
 
+#include "common.h"
+
 #ifdef USING_GPU
     #include <iCub/stereoVision/utils.h>
 #endif
@@ -268,7 +270,6 @@ using namespace iCub::ctrl;
 using namespace iCub::iKin;
 
 using namespace cv::ximgproc;
-
 
 class DispModule: public yarp::os::RFModule
 {
@@ -289,7 +290,7 @@ class DispModule: public yarp::os::RFModule
 //    BufferedPort<ImageOf<PixelRgbFloat> > worldCylPort;
     Port handlerPort;
 
-    BufferedPort<ImageOf<PixelMono> > outDepth;
+    BufferedPort<ImageOf<PixelFloat> > outDepth;
     BufferedPort<ImageOf<PixelMono> >  outDisp;
 
 //    BufferedPort<ImageOf<PixelRgb> >  outLeftRectImgPort;
@@ -316,6 +317,7 @@ class DispModule: public yarp::os::RFModule
     bool doBLF;
     bool useWLSfiltering;
     bool usePorts;
+    bool left_right;
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
@@ -351,7 +353,7 @@ class DispModule: public yarp::os::RFModule
 
     void initializeStereoParams();
 
-    Mat depthFromDisparity(Mat disp, float f, int numDisp);
+    Mat depthFromDisparity(Mat disp, Mat Q);
 
 
     GUI gui;
@@ -359,6 +361,8 @@ class DispModule: public yarp::os::RFModule
     bool init;
 
 public:
+
+    cv::Mat dispT;
 
     bool configure(ResourceFinder &rf);
     bool close();

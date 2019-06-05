@@ -174,6 +174,8 @@ private:
 
 public:
 
+    Mat filtered_disp;
+
     /**
     * Default Constructor. You should initialize all the intrinsic and extrinsic parameters
     * using the provided methods.
@@ -585,6 +587,6 @@ public:
     Point2f fromRectifiedToOriginal(int u, int v, int camera);
 
 
-    cv::Mat computeDisparity_filt(bool best=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0, double wls_lambda=8000., double wls_sigma=1.5);
+    cv::Mat computeDisparity_filt(bool best=true, bool left_right=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0, double wls_lambda=8000., double wls_sigma=1.5);
 
 };

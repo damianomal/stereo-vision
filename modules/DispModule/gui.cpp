@@ -51,7 +51,7 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                        int speckleWindowSize, int speckleRange, double sigmaColorBLF,
                        double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
-                       bool useWLS, bool useBLF)
+                       bool useWLS, bool left_right, bool useBLF)
 {
 
     this->minDisparity = minDisparity;
@@ -67,6 +67,7 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
     this->wls_lambda = wls_lambda;
     this->wls_sigma = wls_sigma;
     this->useWLS = useWLS;
+    this->left_right = left_right;
     this->useBLF = useBLF;
 
     return GUI::initializeGUI();
@@ -213,7 +214,10 @@ void GUI::updateGUI()
 
     this->updated |= ImGui::Checkbox("Use WLS", &this->useWLS);  ImGui::SameLine();
 
+    this->updated |= ImGui::Checkbox("Use left-right cons.", &this->left_right);  ImGui::SameLine();
+
     this->updated |= ImGui::Checkbox("Use BLF", &this->useBLF);
+
 
     this->updated |= this->recalibrate;
 
@@ -234,7 +238,7 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
                     int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                     int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
                     double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                    bool& useWLS, bool& useBLF)
+                    bool& useWLS, bool& left_right, bool& useBLF)
 {
     minDisparity = this->minDisparity;
     numberOfDisparities = this->numberOfDisparities;
@@ -249,6 +253,7 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     wls_lambda = this->wls_lambda;
     wls_sigma = this->wls_sigma;
     useWLS = this->useWLS;
+    left_right = this->left_right;
     useBLF = this->useBLF;
 }
 

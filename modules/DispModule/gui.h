@@ -52,6 +52,7 @@ private:
     float wls_sigma;
     bool useWLS;
     bool useBLF;
+    bool left_right;
 
 public:
 
@@ -64,7 +65,7 @@ public:
                                              int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                                              int speckleWindowSize, int speckleRange, double sigmaColorBLF,
                                              double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
-                                             bool useWls, bool useBLF);
+                                             bool useWls, bool left_right, bool useBLF);
     void updateGUI();
     void setVal(int);
     int getVal();
@@ -72,7 +73,7 @@ public:
                    int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                    int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
                    double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                   bool& useWls, bool& useBLF);
+                   bool& useWls, bool& left_right, bool& useBLF);
     bool isDone();
     bool isUpdated();
     void setUpdated(bool);

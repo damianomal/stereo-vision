@@ -42,6 +42,14 @@ char const *debug_strings[] = {
 
 using namespace yarp::cv;
 
+#include "common.h"
+
+void free_gpu_mem();
+cv::Mat compute_disparity(cv::Mat *left_img, cv::Mat *right_img, float *cost_time);
+void cuda_init(SGM_PARAMS *params);
+cv::Mat zy_remap(cv::Mat &img1, cv::Mat &img2);
+
+
 
 bool DispModule::configure(ResourceFinder & rf)
 {
@@ -102,14 +110,13 @@ bool DispModule::configure(ResourceFinder & rf)
     this->initializeStereoParams();
 
     this->doBLF = !rf.check("skipBLF");
-
-    cout << " Bilateral filter set to " << doBLF << endl;
-
-    this->debugWindow = !rf.check("debug");
+    cout << " Bilateral filter set to " << this->doBLF << endl;
 
     this->useWLSfiltering = rf.check("wls");
-
     cout << " WLS filtering set to " << this->useWLSfiltering << endl;
+
+    this->debugWindow = !rf.check("debug");
+    this->left_right = rf.check("left_right");
 
 
     if(this->debugWindow)
@@ -118,7 +125,7 @@ bool DispModule::configure(ResourceFinder & rf)
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
                             this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
-                            this->useWLSfiltering, this->doBLF);
+                            this->useWLSfiltering, this->left_right, this->doBLF);
 //        this->gui.initializeGUI();
     }
 
@@ -199,26 +206,67 @@ bool DispModule::configure(ResourceFinder & rf)
     for(int i = 0; i < 10; i++)
         this->debug_timings[i] = 0;
 
+    SGM_PARAMS params;
+    params.preFilterCap = 63;
+    params.BlockSize = 6;
+    params.P1 = 8 * params.BlockSize * params.BlockSize;
+    params.P2 = 32 * params.BlockSize * params.BlockSize;
+    params.uniquenessRatio = 7;
+    params.disp12MaxDiff = 0;
+    cuda_init(&params);
+
+
     return true;
 
 }
 
-cv::Mat DispModule::depthFromDisparity(Mat disp, float f, int numDisp)
+//cv::Mat DispModule::depthFromDisparity(Mat disp, float f, int numDisp)
+//{
+//    yarp::sig::Vector xL, xR;
+//    yarp::sig::Vector o_temp;
+
+//    bool check = igaze->getLeftEyePose(xL, o_temp);
+//    check &= igaze->getRightEyePose(xR, o_temp);
+
+//    float baseline = norm(xL-xR);
+
+//    cv::Mat depth;
+
+//    disp.convertTo(depth, CV_32FC1);
+
+//    cv::Mat res = (f * baseline) / (depth * disp.cols);
+
+//    return res;
+//}
+
+cv::Mat DispModule::depthFromDisparity(Mat disp, Mat Q)
 {
-    yarp::sig::Vector xL, xR;
-    yarp::sig::Vector o_temp;
+//    yarp::sig::Vector xL, xR;
+//    yarp::sig::Vector o_temp;
 
-    bool check = igaze->getLeftEyePose(xL, o_temp);
-    check &= igaze->getRightEyePose(xR, o_temp);
+//    bool check = igaze->getLeftEyePose(xL, o_temp);
+//    check &= igaze->getRightEyePose(xR, o_temp);
 
-    float baseline = norm(xL-xR);
+//    float baseline = norm(xL-xR);
 
-    cv::Mat depth;
+//    cv::Mat depth;
 
-    disp.convertTo(depth, CV_32FC1);
+//    disp.convertTo(depth, CV_32FC1);
 
-    return (f * baseline) / (depth * disp.cols);
+//    cv::Mat res = (f * baseline) / (depth * disp.cols);
+
+//    return res;
+
+    cv::Mat repr;
+
+    disp /= 16;
+
+    reprojectImageTo3D(disp, repr, Q, false);
+    extractChannel(repr, repr, 2);
+
+    return repr;
 }
+
 
 void DispModule::initializeStereoParams()
 {
@@ -338,6 +386,29 @@ bool DispModule::close()
     return true;
 }
 
+Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
+
+
+Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
+{
+    int min_disparity = matcher_instance->getMinDisparity();
+    int num_disparities = matcher_instance->getNumDisparities();
+    int block_size = matcher_instance->getBlockSize();
+
+    int bs2 = block_size/2;
+    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
+
+    int xmin = maxD + bs2;
+    int xmax = src_sz.width + minD - bs2;
+    int ymin = bs2;
+    int ymax = src_sz.height - bs2;
+
+    Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
+    std::cout << "roi:" << r << std::endl;
+    return r;
+}
+
+
 /******************************************************************************/
 bool DispModule::updateModule()
 {
@@ -388,17 +459,17 @@ bool DispModule::updateModule()
 
     //DEBUG
 
-    this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-                                                8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-                                                32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-                                                this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-                                                this->speckleWindowSize,this->speckleRange,
-                                                this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+//    this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+//                                                8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+//                                                32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
+//                                                this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+//                                                this->speckleWindowSize,this->speckleRange,
+//                                                this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
-    wls_filter = createDisparityWLSFilter(this->sgbm_temp);
+//    wls_filter = createDisparityWLSFilter(this->sgbm_temp);
 
-    wls_filter->setLambda(8000.0);
-    wls_filter->setSigmaColor(1.5);
+//    wls_filter->setLambda(8000.0);
+//    wls_filter->setSigmaColor(1.5);
 
 
     // TODO: this part has been commented since the resolution of the
@@ -497,7 +568,7 @@ bool DispModule::updateModule()
         this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
-                            this->wls_lambda, this->wls_sigma, this->useWLSfiltering, this->doBLF);
+                            this->wls_lambda, this->wls_sigma, this->useWLSfiltering, this->left_right, this->doBLF);
 
 
 
@@ -524,23 +595,58 @@ bool DispModule::updateModule()
 
     PROF_S
 
+
+    mutexDisp.lock();
+
     if(!this->useWLSfiltering)
     {
-        mutexDisp.lock();
-
         this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
                     this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
                     this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
 
-        mutexDisp.unlock();
+    }
+    else if(true)
+    {
+
+        this->stereo->rectifyImages();
+
+        cv::Mat grayL = this->stereo->getLRectified();
+        cv::Mat grayR = this->stereo->getRRectified();
+
+        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+        cv::cvtColor(grayR, grayR, CV_BGR2GRAY);
+
+        outputDm = zy_remap(grayL, grayR);
+
+        Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
+                                                    8*3*SADWindowSize*SADWindowSize,
+                                                    32*3*SADWindowSize*SADWindowSize,
+                                                    disp12MaxDiff,preFilterCap,uniquenessRatio,
+                                                    speckleWindowSize,speckleRange,
+                                                    true?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+        Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
+        wls_filter->setLambda(this->wls_lambda);
+        wls_filter->setSigmaColor(this->wls_sigma);
+        Rect ROI = computeROI2(this->stereo->getLRectified().size(),sgbm);
+        wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
+        wls_filter->filter(outputDm,this->stereo->getLRectified(),outputDm,Mat(),ROI);
+
+
+        getDisparityVis(outputDm, outputDm, 2);
+
+        std::cout << "AAA" << std::endl;
+
     }
     else
     {
-        outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+        outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->left_right, this->uniquenessRatio,this->speckleWindowSize,
                                                  this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
                                                  this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
                                                  this->wls_lambda, this->wls_sigma);
     }
+
+    mutexDisp.unlock();
 
     PROF_E
     PROF_D(6)
@@ -557,6 +663,7 @@ bool DispModule::updateModule()
             {
                 ImageOf<PixelMono> &outim = outDisp.prepare();
                 Mat outimMat;
+
                 if (doBLF)
                 {
                     Mat outputDfiltm;
@@ -567,9 +674,16 @@ bool DispModule::updateModule()
                 {
                     outimMat = outputDm;
                 }
+
                 outim = fromCvMat<PixelMono>(outimMat);
                 outDisp.write();
             }
+        }
+        else if(true)
+        {
+            ImageOf<PixelMono> &outim = outDisp.prepare();
+            outim = fromCvMat<PixelMono>(outputDm);
+            outDisp.write();
         }
         else
         {
@@ -604,22 +718,81 @@ bool DispModule::updateModule()
     PROF_E
     PROF_D(7)
 
+
+
+
     PROF_S
 
     if (outDepth.getOutputCount()>0)
     {
-        outputDepth = this->depthFromDisparity(outputDm, 234.5, this->numberOfDisparities);
 
-        if (!outputDepth.empty())
+        if (outputDm.empty())
         {
-            ImageOf<PixelMono> &outim = outDepth.prepare();
-            outim = fromCvMat<PixelMono>(outputDepth);
-            outDepth.write();
+            std::cout << "!!! Impossible to compute the depth map: disparity is not available" << std::endl;
         }
+        else
+        {
+    //        outputDepth = this->depthFromDisparity(outputDm, 234.5, this->numberOfDisparities);
+            if(this->useWLSfiltering)
+                outputDepth = this->depthFromDisparity(this->stereo->filtered_disp, this->stereo->getQ());
+            else
+                outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
+
+
+            if (!outputDepth.empty())
+            {
+                ImageOf<PixelFloat> &outim = outDepth.prepare();
+
+                threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
+
+//                threshold(outputDepth, outputDepth, 0., 0., CV_THRESH_TOZERO);
+//                cv::cvtColor(outputDepth, outputDepth,CV_32F);
+
+//                getDisparityVis(outputDepth, outputDepth, 25);
+
+//                cv::Mat cmm, cm2;
+
+//                cv::cvtColor(outputDepth, cm2, CV_8UC1);
+
+//                applyColorMap(outputDepth, cmm, COLORMAP_AUTUMN);
+
+
+//                cv::namedWindow("AA");
+//                cv::imshow("AA", cmm);
+//                cv::waitKey(1);
+
+                outputDepth /= 10;
+
+                outim = fromCvMat<PixelFloat>(outputDepth);
+
+                outDepth.write();
+            }
+        }
+
     }
 
     PROF_E
     PROF_D(8)
+
+
+    // DEBUG: printing values from the disparity and depth maps
+
+    if(!outputDm.empty())
+    {
+        std::cout << "------------------" << std::endl;
+
+        double min, max;
+        cv::minMaxLoc(this->stereo->filtered_disp, &min, &max);
+        std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
+    }
+
+    if(!outputDepth.empty())
+    {
+        double min, max;
+        cv::minMaxLoc(outputDepth, &min, &max);
+        std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
+    }
+
 
 //    double min, max;
 //    cv::minMaxLoc(outputDm, &min, &max);
