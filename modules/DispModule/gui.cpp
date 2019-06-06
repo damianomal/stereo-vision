@@ -37,7 +37,7 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
 
     this->convertEnumToID();
 
-    return GUI::initializeGUI();
+    return this->initializeGUI();
 }
 
 int GUI::initializeGUI()
@@ -70,7 +70,7 @@ int GUI::initializeGUI()
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        this->window = SDL_CreateWindow("SGBM parameters", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 350, window_flags);
+        this->window = SDL_CreateWindow("SGBM parameters", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 585, 415, window_flags);
         this->gl_context = SDL_GL_CreateContext(window);
         SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -148,11 +148,11 @@ void GUI::updateGUI()
 
     this->updated |= ImGui::SliderInt("MinDisparity", &this->minDisparity, 0, 20);
 
+    ImGui::Text("numberOfDisparities:  "); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("32", &this->numberOfDisparities, 32); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("64", &this->numberOfDisparities, 64); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("96", &this->numberOfDisparities, 96); ImGui::SameLine();
-    this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128); ImGui::SameLine();
-    ImGui::Text("numberOfDisparities");
+    this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128);
 
     this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
     this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 20);
@@ -176,18 +176,21 @@ void GUI::updateGUI()
 
     // Alternatives for the stereo matching algorithm to be used
 
+    ImGui::Text("Stereo Matching Algorithm: "); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("SGBM", &this->stereo_matching_id, 0); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("CUDA SGBM", &this->stereo_matching_id, 1); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("LibElas", &this->stereo_matching_id, 2);
 
     // Alternatives for the BLF filtering
 
+    ImGui::Text("Bilateral Filtering:       "); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("No BLF", &this->BLFfiltering_id, 0); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("Original BLF", &this->BLFfiltering_id, 1); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("CUDA BLF", &this->BLFfiltering_id, 2);
 
     // Alternatives for the WLS filtering
 
+    ImGui::Text("Weighted LS Filtering:     "); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("No WLS", &this->WLSfiltering_id, 0); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("WLS", &this->WLSfiltering_id, 1); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("WLS with l/r cons.", &this->WLSfiltering_id, 2);
@@ -244,30 +247,39 @@ void GUI::convertIDToEnum()
     {
         case 0:
             this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+            break;
         case 1:
             this->stereo_matching = STEREO_VISION::SGBM_CUDA;
+            break;
         case 2:
             this->stereo_matching = STEREO_VISION::LIBELAS;
+            break;
     }
 
     switch(this->BLFfiltering_id)
     {
         case 0:
             this->BLFfiltering = STEREO_VISION::BLF_DISABLED;
+            break;
         case 1:
             this->BLFfiltering = STEREO_VISION::BLF_ORIGINAL;
+            break;
         case 2:
             this->BLFfiltering = STEREO_VISION::BLF_CUDA;
+            break;
     }
 
     switch(this->WLSfiltering_id)
     {
         case 0:
             this->WLSfiltering = STEREO_VISION::WLS_DISABLED;
+            break;
         case 1:
             this->WLSfiltering = STEREO_VISION::WLS_ENABLED;
+            break;
         case 2:
             this->WLSfiltering = STEREO_VISION::WLS_LRCHECK;
+            break;
     }
 
 }
@@ -279,10 +291,13 @@ void GUI::convertEnumToID()
     {
         case STEREO_VISION::SGBM_OPENCV:
             this->stereo_matching_id = 0;
+            break;
         case STEREO_VISION::SGBM_CUDA:
             this->stereo_matching_id = 1;
+            break;
         case STEREO_VISION::LIBELAS:
             this->stereo_matching_id = 2;
+            break;
 
     }
 
@@ -290,10 +305,13 @@ void GUI::convertEnumToID()
     {
         case STEREO_VISION::BLF_DISABLED:
             this->BLFfiltering_id = 0;
+            break;
         case STEREO_VISION::BLF_ORIGINAL:
             this->BLFfiltering_id = 1;
+            break;
         case STEREO_VISION::BLF_CUDA:
             this->BLFfiltering_id = 2;
+            break;
 
     }
 
@@ -301,12 +319,17 @@ void GUI::convertEnumToID()
     {
         case STEREO_VISION::WLS_DISABLED:
             this->WLSfiltering_id = 0;
+            break;
         case STEREO_VISION::WLS_ENABLED:
             this->WLSfiltering_id = 1;
+            break;
         case STEREO_VISION::WLS_LRCHECK:
             this->WLSfiltering_id = 2;
+            break;
 
     }
+
+
 
 }
 

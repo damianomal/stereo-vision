@@ -594,4 +594,7 @@ public:
 
     void computeRightDisparity(bool best=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0);
     cv::Mat getRightDisparity();
+    cv::Mat getRightDisparity16();
+    void setRightDisparity(cv::Mat d);
+
 };

@@ -651,7 +651,7 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 
         if (success)
         {
-            std::cout << numberOfDisparities << std::endl;
+//            std::cout << numberOfDisparities << std::endl;
 
             map = disp * (255.0 / numberOfDisparities);
             //threshold(map, map, 0, 255.0, THRESH_TOZERO);
@@ -2762,62 +2762,63 @@ void StereoCamera::computeRightDisparity(bool best, int uniquenessRatio, int spe
 
     right_matcher->compute(this->imgRightRect, this->imgLeftRect, this->right_disp);
 
-    Mat disp,disp8,map,dispTemp;
-    bool success;
+//    Mat disp,disp8,map,dispTemp;
+//    bool success;
 
-    this->right_disp.convertTo(map, CV_32FC1, 1.0,0.0);
-    map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
-    //normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+//    this->right_disp.convertTo(map, CV_32FC1, 1.0,0.0);
+//    map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
+//    //normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
 
-    if (success)
-    {
-        if (cameraChanged)
-        {
-            this->mutex->wait();
+//    success = true;
 
-            Mat inverseMapL(map.rows*map.cols,1,CV_32FC2);
-            Mat inverseMapR(map.rows*map.cols,1,CV_32FC2);
+//    if (success)
+//    {
+//        if (cameraChanged)
+//        {
+//            this->mutex->wait();
 
-            for (int y=0; y<map.rows; y++)
-            {
-                for (int x=0; x<map.cols; x++)
-                {
-                    inverseMapL.ptr<float>(y*map.cols+x)[0]=(float)x;
-                    inverseMapL.ptr<float>(y*map.cols+x)[1]=(float)y;
-                    inverseMapR.ptr<float>(y*map.cols+x)[0]=(float)x;
-                    inverseMapR.ptr<float>(y*map.cols+x)[1]=(float)y;
-                }
-            }
+//            Mat inverseMapL(map.rows*map.cols,1,CV_32FC2);
+//            Mat inverseMapR(map.rows*map.cols,1,CV_32FC2);
 
-            undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
-            undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
+//            for (int y=0; y<map.rows; y++)
+//            {
+//                for (int x=0; x<map.cols; x++)
+//                {
+//                    inverseMapL.ptr<float>(y*map.cols+x)[0]=(float)x;
+//                    inverseMapL.ptr<float>(y*map.cols+x)[1]=(float)y;
+//                    inverseMapR.ptr<float>(y*map.cols+x)[0]=(float)x;
+//                    inverseMapR.ptr<float>(y*map.cols+x)[1]=(float)y;
+//                }
+//            }
 
-            Mat mapperL=inverseMapL.reshape(2,map.rows);
-            Mat mapperR=inverseMapR.reshape(2,map.rows);
-            this->MapperL=mapperL;
-            this->MapperR=mapperR;
+//            undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
+//            undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
 
-            this->mutex->post();
+//            Mat mapperL=inverseMapL.reshape(2,map.rows);
+//            Mat mapperR=inverseMapR.reshape(2,map.rows);
+//            this->MapperL=mapperL;
+//            this->MapperR=mapperR;
 
-            cameraChanged = false;
-        }
+//            this->mutex->post();
 
-        Mat x;
+//            cameraChanged = false;
+//        }
 
-        remap(map,dispTemp,this->MapperR,x,cv::INTER_LINEAR);
-        dispTemp.convertTo(disp8,CV_8U);
+//        Mat x;
 
-//        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
-//        std::cout << disp.size() << std::endl;
+//        remap(map,dispTemp,this->MapperR,x,cv::INTER_LINEAR);
+//        dispTemp.convertTo(disp8,CV_8U);
 
-        if (use_elas)
-            disp.convertTo(disp, CV_16SC1, 16.0);
-    }
+////        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
+////        std::cout << disp.size() << std::endl;
 
-    this->right_disp = disp8;
-    this->right_disp16 = disp;
+////        if (use_elas)
+////            disp.convertTo(disp, CV_16SC1, 16.0);
+//    }
 
-    success = true;
+//    this->right_disp = disp8;
+//    this->right_disp16 = disp;
+
 
 }
 
@@ -2825,4 +2826,16 @@ void StereoCamera::computeRightDisparity(bool best, int uniquenessRatio, int spe
 cv::Mat StereoCamera::getRightDisparity()
 {
     return this->right_disp;
+}
+
+cv::Mat StereoCamera::getRightDisparity16()
+{
+    return this->right_disp16;
+}
+
+// DEBUG: convenience method
+
+void StereoCamera::setRightDisparity(cv::Mat d)
+{
+    this->right_disp = d;
 }

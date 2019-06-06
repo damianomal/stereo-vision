@@ -44,16 +44,15 @@ char const *debug_strings[] = {
 using namespace yarp::cv;
 
 #include "common.h"
-
-void free_gpu_mem();
-cv::Mat compute_disparity(cv::Mat *left_img, cv::Mat *right_img, float *cost_time);
-void cuda_init(SGM_PARAMS *params);
-cv::Mat zy_remap(cv::Mat &img1, cv::Mat &img2);
-
+#include "sgbm_cuda_header.h"
 
 
 bool DispModule::configure(ResourceFinder & rf)
 {
+
+//    if(rf.check("640"))
+//        rf.setDefaultConfigFile("icubEyes_640x480.ini");
+
     string name=rf.check("name",Value("SFM")).asString();
     string robot=rf.check("robot",Value("icub")).asString();
     string left=rf.check("leftPort",Value("/left:i")).asString();
@@ -97,9 +96,6 @@ bool DispModule::configure(ResourceFinder & rf)
 
     this->stereo = new StereoCamera(true);
 
-    if (!rf.check("use_sgbm"))
-        stereo->initELAS(rf);        
-
     Mat KL, KR, DistL, DistR;
 
     loadIntrinsics(rf,KL,KR,DistL,DistR);
@@ -109,9 +105,6 @@ bool DispModule::configure(ResourceFinder & rf)
     stereo->setIntrinsics(KL,KR,DistL,DistR);
 
     this->initializeStereoParams();
-
-    STEREO_VISION BLFfiltering;
-    STEREO_VISION WLSfiltering;
 
 
     if (rf.check("sgbm"))
@@ -141,15 +134,7 @@ bool DispModule::configure(ResourceFinder & rf)
         this->WLSfiltering = STEREO_VISION::WLS_DISABLED;
 
 
-//    this->doBLF = !rf.check("skipBLF");
-//    cout << " Bilateral filter set to " << this->doBLF << endl;
-
-//    this->useWLSfiltering = rf.check("wls");
-//    cout << " WLS filtering set to " << this->useWLSfiltering << endl;
-
     this->debugWindow = !rf.check("debug");
-//    this->left_right = rf.check("left_right");
-
 
     if(this->debugWindow)
     {
@@ -158,7 +143,6 @@ bool DispModule::configure(ResourceFinder & rf)
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
                             this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
                             this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
-//        this->gui.initializeGUI();
     }
 
 
@@ -193,8 +177,7 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else if (this->usePorts)
     {
-        string fakeEyes=rf.check("fakeEyesPort",Value("/fakeEyes:i")).asString();
-
+//        string fakeEyes=rf.check("fakeEyesPort",Value("/fakeEyes:i")).asString();
 //        fakeEkesPort.open(fakeEyes);
 //        =rf.check("rightPort",Value("/right:i")).asString();
     }
@@ -251,6 +234,14 @@ bool DispModule::configure(ResourceFinder & rf)
     this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
 
     cuda_init(&this->cuda_params);
+
+    this->params_right.preFilterCap = this->preFilterCap;
+    this->params_right.BlockSize = this->SADWindowSize;
+    this->params_right.P1 = 8 * this->params_right.BlockSize * this->params_right.BlockSize;
+    this->params_right.P2 = 32 * this->params_right.BlockSize * this->params_right.BlockSize;
+    this->params_right.uniquenessRatio = 0;
+    this->params_right.disp12MaxDiff = 1000000;
+
 
     int radius = 7;
     int iters = 1;
@@ -432,6 +423,11 @@ bool DispModule::close()
 Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
 
 
+//Rect getB(cv::Mat disp, int th)
+//{
+
+//}
+
 Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
 {
     int min_disparity = matcher_instance->getMinDisparity();
@@ -447,7 +443,7 @@ Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
     int ymax = src_sz.height - bs2;
 
     Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
-    std::cout << "roi:" << r << std::endl;
+//    std::cout << "roi:" << r << std::endl;
     return r;
 }
 
@@ -650,6 +646,20 @@ bool DispModule::updateModule()
 
             outputDm = zy_remap(grayL, grayR);
 
+            // DEBUG: NOT WORKING
+
+            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
+            {
+
+                cuda_init(&this->params_right);
+
+                cv::Mat outputDm_r = zy_remap(grayR, grayL);
+
+                this->stereo->setRightDisparity(outputDm_r);
+
+                cuda_init(&cuda_params);
+            }
+
             break;
 
         default:
@@ -693,6 +703,7 @@ bool DispModule::updateModule()
         default:
 
             disp_blf = outputDm;
+
             break;
     }
 
@@ -705,7 +716,6 @@ bool DispModule::updateModule()
     Ptr<DisparityWLSFilter> wls_filter;
 
     PROF_S
-
 
     if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
     {
@@ -743,6 +753,11 @@ bool DispModule::updateModule()
                     wls_filter->setLambda(wls_lambda);
                     wls_filter->setSigmaColor(wls_sigma);
 
+//                    std::cout << this->stereo->getRightDisparity().channels() << std::endl;
+//                    std::cout << this->stereo->getRightDisparity().size << std::endl;
+//                    std::cout << this->stereo->getRightDisparity().rows << std::endl;
+//                    std::cout << this->stereo->getRightDisparity().cols << std::endl;
+
                     wls_filter->filter(disp_blf,left_rect,disp_wls,this->stereo->getRightDisparity());
                 }
                 else
@@ -750,14 +765,14 @@ bool DispModule::updateModule()
 
                 break;
 
-            case STEREO_VISION::WLS_DISABLED:
             default:
-
-                disp_wls = disp_blf;
 
                 break;
         }
     }
+    else
+        disp_wls = disp_blf;
+
 
     PROF_E
     PROF_D(8)
@@ -768,6 +783,10 @@ bool DispModule::updateModule()
     if (outDisp.getOutputCount()>0 && !disp_wls.empty())
     {
         ImageOf<PixelMono> &outim = outDisp.prepare();
+
+        if(this->stereo_matching == STEREO_VISION::SGBM_CUDA)
+            getDisparityVis(disp_wls, disp_wls, 2);
+
         outim = fromCvMat<PixelMono>(disp_wls);
         outDisp.write();
     }
@@ -781,22 +800,19 @@ bool DispModule::updateModule()
     if (outDepth.getOutputCount()>0)
     {
 
-        if (outputDm.empty())
+        if (disp_wls.empty())
         {
             std::cout << "!!! Impossible to compute the depth map: disparity is not available" << std::endl;
         }
         else
         {
 
-            if (!outputDepth.empty())
-            {
+            ImageOf<PixelFloat> &outim = outDepth.prepare();
 
-                ImageOf<PixelFloat> &outim = outDepth.prepare();
-
-                if(this->useWLSfiltering)
-                    outputDepth = this->depthFromDisparity(disp_wls, this->stereo->getQ());
-                else
-                    outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
+            if(this->useWLSfiltering)
+                outputDepth = this->depthFromDisparity(disp_wls, this->stereo->getQ());
+            else
+                outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
 
 
 //                threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
@@ -819,10 +835,10 @@ bool DispModule::updateModule()
 
 //                outputDepth /= 10;
 
-                outim = fromCvMat<PixelFloat>(outputDepth);
+            outim = fromCvMat<PixelFloat>(outputDepth);
 
-                outDepth.write();
-            }
+            outDepth.write();
+
         }
 
     }
@@ -838,16 +854,16 @@ bool DispModule::updateModule()
         std::cout << "------------------" << std::endl;
 
         double min, max;
-        cv::minMaxLoc(this->stereo->filtered_disp, &min, &max);
+        cv::minMaxLoc(disp_wls, &min, &max);
         std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
     }
 
-    if(!outputDepth.empty())
-    {
-        double min, max;
-        cv::minMaxLoc(outputDepth, &min, &max);
-        std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
-    }
+//    if(!outputDepth.empty())
+//    {
+//        double min, max;
+//        cv::minMaxLoc(outputDepth, &min, &max);
+//        std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
+//    }
 
     if(this->debugWindow)
         this->gui.updateGUI();
@@ -855,14 +871,12 @@ bool DispModule::updateModule()
     if(this->gui.isDone())
         this->gui.killGUI();
 
-    debug_count++;
-
-    if(debug_count == 100)
+    if(++debug_count == 100)
     {
 
         std::cout << std::endl << "---- DISPMODULE: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
 
-        for(int i = 0; i < debug_num_timings; i++)
+        for(int i = 0; i < this->debug_num_timings; i++)
         {
             std::cout << debug_strings[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
             this->debug_timings[i] = 0;
@@ -1013,6 +1027,7 @@ void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
         int _minDisparity, int _preFilterCap, int _disp12MaxDiff)
 {
     this->mutexDisp.lock();
+
     this->useBestDisp=_useBestDisp;
     this->uniquenessRatio=_uniquenessRatio;
     this->speckleWindowSize=_speckleWindowSize;
@@ -1022,6 +1037,7 @@ void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
     this->minDisparity=_minDisparity;
     this->preFilterCap=_preFilterCap;
     this->disp12MaxDiff=_disp12MaxDiff;
+
     this->mutexDisp.unlock();
 
 }
@@ -1462,7 +1478,10 @@ int main(int argc, char *argv[])
 
     ResourceFinder rf;
     rf.setVerbose(true);
+
     rf.setDefaultConfigFile("icubEyes.ini");
+//    rf.setDefaultConfigFile("icubEyes_640x480.ini");
+
     rf.setDefaultContext("cameraCalibration");
     rf.configure(argc,argv);
 

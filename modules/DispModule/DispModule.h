@@ -366,7 +366,7 @@ class DispModule: public yarp::os::RFModule
     STEREO_VISION stereo_matching;
 
     Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
-    SGM_PARAMS cuda_params;
+    SGM_PARAMS cuda_params, params_right;
 
 public:
 
