@@ -35,10 +35,11 @@ char const *debug_strings[] = {
     "doSFM",
     "gui.isUpdated",
     "computeDisparity",
-    "output+bilateralFilter",
-    "depth computation"
+    "bilateralFilter",
+    "wlsFilter",
+    "ouputDisparity",
+    "outputDepth"
 };
-
 
 using namespace yarp::cv;
 
@@ -97,7 +98,7 @@ bool DispModule::configure(ResourceFinder & rf)
     this->stereo = new StereoCamera(true);
 
     if (!rf.check("use_sgbm"))
-        stereo->initELAS(rf);
+        stereo->initELAS(rf);        
 
     Mat KL, KR, DistL, DistR;
 
@@ -109,14 +110,45 @@ bool DispModule::configure(ResourceFinder & rf)
 
     this->initializeStereoParams();
 
-    this->doBLF = !rf.check("skipBLF");
-    cout << " Bilateral filter set to " << this->doBLF << endl;
+    STEREO_VISION BLFfiltering;
+    STEREO_VISION WLSfiltering;
 
-    this->useWLSfiltering = rf.check("wls");
-    cout << " WLS filtering set to " << this->useWLSfiltering << endl;
+
+    if (rf.check("sgbm"))
+        this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+    else if(rf.check("sgbm_cuda"))
+        this->stereo_matching = STEREO_VISION::SGBM_CUDA;
+    else if(rf.check("libelas"))
+    {
+        this->stereo_matching = STEREO_VISION::LIBELAS;
+        this->stereo->initELAS(rf);
+    }
+    else
+        this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+
+    if (rf.check("blf"))
+        this->BLFfiltering = STEREO_VISION::BLF_ORIGINAL;
+    else if(rf.check("blf_cuda"))
+        this->BLFfiltering = STEREO_VISION::BLF_CUDA;
+    else
+        this->BLFfiltering = STEREO_VISION::BLF_DISABLED;
+
+    if (rf.check("wls"))
+        this->WLSfiltering = STEREO_VISION::WLS_ENABLED;
+    else if(rf.check("wls_lr"))
+        this->WLSfiltering = STEREO_VISION::WLS_LRCHECK;
+    else
+        this->WLSfiltering = STEREO_VISION::WLS_DISABLED;
+
+
+//    this->doBLF = !rf.check("skipBLF");
+//    cout << " Bilateral filter set to " << this->doBLF << endl;
+
+//    this->useWLSfiltering = rf.check("wls");
+//    cout << " WLS filtering set to " << this->useWLSfiltering << endl;
 
     this->debugWindow = !rf.check("debug");
-    this->left_right = rf.check("left_right");
+//    this->left_right = rf.check("left_right");
 
 
     if(this->debugWindow)
@@ -125,7 +157,7 @@ bool DispModule::configure(ResourceFinder & rf)
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
                             this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
-                            this->useWLSfiltering, this->left_right, this->doBLF);
+                            this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
 //        this->gui.initializeGUI();
     }
 
@@ -203,17 +235,28 @@ bool DispModule::configure(ResourceFinder & rf)
 
     this->debug_count = 0;
 
-    for(int i = 0; i < 10; i++)
+    this->debug_num_timings = 11;
+
+    debug_timings = new int[debug_num_timings];
+
+    for(int i = 0; i < debug_num_timings; i++)
         this->debug_timings[i] = 0;
 
-    SGM_PARAMS params;
-    params.preFilterCap = 63;
-    params.BlockSize = 6;
-    params.P1 = 8 * params.BlockSize * params.BlockSize;
-    params.P2 = 32 * params.BlockSize * params.BlockSize;
-    params.uniquenessRatio = 7;
-    params.disp12MaxDiff = 0;
-    cuda_init(&params);
+
+    this->cuda_params.preFilterCap = this->preFilterCap;
+    this->cuda_params.BlockSize = this->SADWindowSize;
+    this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
+    this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
+    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
+    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
+
+    cuda_init(&this->cuda_params);
+
+    int radius = 7;
+    int iters = 1;
+
+    pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
+    pCudaBilFilter->setSigmaRange(sigmaColorBLF);
 
 
     return true;
@@ -409,6 +452,17 @@ Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
 }
 
 
+//Ptr<StereoSGBM> right_sgbm = StereoSGBM::create(-(min_disp+num_disp)+1,num_disp,wsize);
+//right_sgbm->setUniquenessRatio(0);
+//right_sgbm->setP1(sgbm->getP1());
+//right_sgbm->setP2(sgbm->getP2());
+//right_sgbm->setMode(sgbm->getMode());
+//right_sgbm->setPreFilterCap(sgbm->getPreFilterCap());
+//right_sgbm->setDisp12MaxDiff(1000000);
+//right_sgbm->setSpeckleWindowSize(0);
+//return right_sgbm;
+
+
 /******************************************************************************/
 bool DispModule::updateModule()
 {
@@ -458,29 +512,6 @@ bool DispModule::updateModule()
     rightMat=toCvMat(*yarp_imgR);
 
     //DEBUG
-
-//    this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-//                                                8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-//                                                32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-//                                                this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-//                                                this->speckleWindowSize,this->speckleRange,
-//                                                this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
-
-//    wls_filter = createDisparityWLSFilter(this->sgbm_temp);
-
-//    wls_filter->setLambda(8000.0);
-//    wls_filter->setSigmaColor(1.5);
-
-
-    // TODO: this part has been commented since the resolution of the
-    // cameras can be forced at execution time, thus, it is not needed
-    // to check it by acquiring the first frame from the stream
-
-//    if (init)
-//    {
-//        this->numberOfDisparities=(leftMat.size().width<=320)?96:128;
-//        init=false;
-//    }
 
     getCameraHGazeCtrl(LEFT);
     getCameraHGazeCtrl(RIGHT);
@@ -561,89 +592,69 @@ bool DispModule::updateModule()
     PROF_D(4)
 
     PROF_S
+
     if(this->gui.isUpdated())
     {
-//        this->mutexDisp.lock();
 
         this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
                             this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
                             this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
-                            this->wls_lambda, this->wls_sigma, this->useWLSfiltering, this->left_right, this->doBLF);
+                            this->wls_lambda, this->wls_sigma, this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
 
+        this->cuda_params.preFilterCap = this->preFilterCap;
+        this->cuda_params.BlockSize = this->SADWindowSize;
+        this->cuda_params.uniquenessRatio = this->uniquenessRatio;
+        this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
 
+        cuda_init(&this->cuda_params);
 
-//        this->sgbm_temp=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-//                                                    8*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-//                                                    32*leftMat.channels()*this->SADWindowSize*this->SADWindowSize,
-//                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-//                                                    this->speckleWindowSize,this->speckleRange,
-//                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
-
-//        wls_filter = createDisparityWLSFilter(this->sgbm_temp);
-
-//        wls_filter->setLambda(8000.0);
-//        wls_filter->setSigmaColor(1.5);
-
-//        right_matcher = createRightMatcher(sgbm_temp);
-
-//        this->mutexDisp.unlock();
         this->gui.setUpdated(false);
     }
 
     PROF_E
     PROF_D(5)
 
-    PROF_S
+    cv::Mat grayL, grayR;
 
+    PROF_S
 
     mutexDisp.lock();
 
-    if(!this->useWLSfiltering)
+    switch(this->stereo_matching)
     {
-        this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-                    this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-                    this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+        case STEREO_VISION::SGBM_OPENCV:
+        case STEREO_VISION::LIBELAS:
 
-    }
-    else if(true)
-    {
+            this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+                        this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                        this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
 
-        this->stereo->rectifyImages();
+            outputDm = stereo->getDisparity();
 
-        cv::Mat grayL = this->stereo->getLRectified();
-        cv::Mat grayR = this->stereo->getRRectified();
+            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
+                this->stereo->computeRightDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+                                                    this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+                                                    this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
 
-        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-        cv::cvtColor(grayR, grayR, CV_BGR2GRAY);
+            break;
 
-        outputDm = zy_remap(grayL, grayR);
+        case STEREO_VISION::SGBM_CUDA:
 
-        Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
-                                                    8*3*SADWindowSize*SADWindowSize,
-                                                    32*3*SADWindowSize*SADWindowSize,
-                                                    disp12MaxDiff,preFilterCap,uniquenessRatio,
-                                                    speckleWindowSize,speckleRange,
-                                                    true?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+            this->stereo->rectifyImages();
 
-        Ptr<DisparityWLSFilter>  wls_filter = createDisparityWLSFilterGeneric(false);
-        wls_filter->setLambda(this->wls_lambda);
-        wls_filter->setSigmaColor(this->wls_sigma);
-        Rect ROI = computeROI2(this->stereo->getLRectified().size(),sgbm);
-        wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
-        wls_filter->filter(outputDm,this->stereo->getLRectified(),outputDm,Mat(),ROI);
+            grayL = this->stereo->getLRectified();
+            grayR = this->stereo->getRRectified();
 
+            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+            cv::cvtColor(grayR, grayR, CV_BGR2GRAY);
 
-        getDisparityVis(outputDm, outputDm, 2);
+            outputDm = zy_remap(grayL, grayR);
 
-        std::cout << "AAA" << std::endl;
+            break;
 
-    }
-    else
-    {
-        outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->left_right, this->uniquenessRatio,this->speckleWindowSize,
-                                                 this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-                                                 this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
-                                                 this->wls_lambda, this->wls_sigma);
+        default:
+
+            throw std::runtime_error(std::string("Wrong stereo_matching value."));
     }
 
     mutexDisp.unlock();
@@ -651,74 +662,118 @@ bool DispModule::updateModule()
     PROF_E
     PROF_D(6)
 
+    cv::Mat disp_blf;
+    cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
+
     PROF_S
 
-    if (outDisp.getOutputCount()>0)
+    switch(this->BLFfiltering)
     {
-        if(!this->useWLSfiltering)
-        {
-            outputDm = stereo->getDisparity();
+        case STEREO_VISION::BLF_ORIGINAL:
 
-            if (!outputDm.empty())
-            {
-                ImageOf<PixelMono> &outim = outDisp.prepare();
-                Mat outimMat;
+            cv_extend::bilateralFilter(outputDm, disp_blf, sigmaColorBLF, sigmaSpaceBLF);
 
-                if (doBLF)
-                {
-                    Mat outputDfiltm;
-                    cv_extend::bilateralFilter(outputDm,outputDfiltm, sigmaColorBLF, sigmaSpaceBLF);
-                    outimMat = outputDfiltm;
-                }
-                else
-                {
-                    outimMat = outputDm;
-                }
+            break;
 
-                outim = fromCvMat<PixelMono>(outimMat);
-                outDisp.write();
-            }
-        }
-        else if(true)
-        {
-            ImageOf<PixelMono> &outim = outDisp.prepare();
-            outim = fromCvMat<PixelMono>(outputDm);
-            outDisp.write();
-        }
-        else
-        {
-            ImageOf<PixelMono> &outim = outDisp.prepare();
-            outim = fromCvMat<PixelMono>(outputDm);
-            outDisp.write();
-        }
+        case STEREO_VISION::BLF_CUDA:
+
+            grayL = this->stereo->getLRectified();
+            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+            imageGpu.upload(grayL);
+            gpuDisp.upload(outputDm);
+
+            pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+            filtGpu.download(disp_blf);
+
+            break;
+
+        case STEREO_VISION::BLF_DISABLED:
+        default:
+
+            disp_blf = outputDm;
+            break;
     }
-
-//        if (outDisp.getOutputCount()>0)
-//        {
-//            mutexDisp.lock();
-
-//            outputDm = stereo->computeDisparity_filt(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-//                                                     this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-//                                                     this->minDisparity,this->preFilterCap,this->disp12MaxDiff,
-//                                                     this->wls_lambda, this->wls_sigma);
-
-//            mutexDisp.unlock();
-
-////            double min, max;
-////                cv::minMaxLoc(outputDm, &min, &max);
-
-////                std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
-
-
-//            ImageOf<PixelMono> &outim = outDisp.prepare();
-//            outim = fromCvMat<PixelMono>(outputDm);
-//            outDisp.write();
-//        }
 
     PROF_E
     PROF_D(7)
 
 
+    cv::Mat disp_wls;
+    Rect ROI;
+    Ptr<DisparityWLSFilter> wls_filter;
+
+    PROF_S
+
+
+    if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
+    {
+
+        Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+                                                    8*3*this->SADWindowSize*this->SADWindowSize,
+                                                    32*3*this->SADWindowSize*this->SADWindowSize,
+                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+                                                    this->speckleWindowSize, this->speckleRange,
+                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+        cv::Mat left_rect = this->stereo->getLRectified();
+
+        switch(this->WLSfiltering)
+        {
+            case STEREO_VISION::WLS_ENABLED:
+
+                wls_filter = createDisparityWLSFilterGeneric(false);
+
+                wls_filter->setLambda(this->wls_lambda);
+                wls_filter->setSigmaColor(this->wls_sigma);
+                wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
+                ROI = computeROI2(left_rect.size(),sgbm);
+
+                wls_filter->filter(disp_blf,left_rect,disp_wls,Mat(),ROI);
+
+                break;
+
+            case STEREO_VISION::WLS_LRCHECK:
+
+                if(this->stereo_matching == STEREO_VISION::SGBM_OPENCV)
+                {
+                    wls_filter = createDisparityWLSFilter(sgbm);
+
+                    wls_filter->setLambda(wls_lambda);
+                    wls_filter->setSigmaColor(wls_sigma);
+
+                    wls_filter->filter(disp_blf,left_rect,disp_wls,this->stereo->getRightDisparity());
+                }
+                else
+                    disp_wls = disp_blf;
+
+                break;
+
+            case STEREO_VISION::WLS_DISABLED:
+            default:
+
+                disp_wls = disp_blf;
+
+                break;
+        }
+    }
+
+    PROF_E
+    PROF_D(8)
+
+
+    PROF_S
+
+    if (outDisp.getOutputCount()>0 && !disp_wls.empty())
+    {
+        ImageOf<PixelMono> &outim = outDisp.prepare();
+        outim = fromCvMat<PixelMono>(disp_wls);
+        outDisp.write();
+    }
+
+    PROF_E
+    PROF_D(9)
 
 
     PROF_S
@@ -732,18 +787,19 @@ bool DispModule::updateModule()
         }
         else
         {
-    //        outputDepth = this->depthFromDisparity(outputDm, 234.5, this->numberOfDisparities);
-            if(this->useWLSfiltering)
-                outputDepth = this->depthFromDisparity(this->stereo->filtered_disp, this->stereo->getQ());
-            else
-                outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
-
 
             if (!outputDepth.empty())
             {
+
                 ImageOf<PixelFloat> &outim = outDepth.prepare();
 
-                threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
+                if(this->useWLSfiltering)
+                    outputDepth = this->depthFromDisparity(disp_wls, this->stereo->getQ());
+                else
+                    outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
+
+
+//                threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
 
 //                threshold(outputDepth, outputDepth, 0., 0., CV_THRESH_TOZERO);
 //                cv::cvtColor(outputDepth, outputDepth,CV_32F);
@@ -761,7 +817,7 @@ bool DispModule::updateModule()
 //                cv::imshow("AA", cmm);
 //                cv::waitKey(1);
 
-                outputDepth /= 10;
+//                outputDepth /= 10;
 
                 outim = fromCvMat<PixelFloat>(outputDepth);
 
@@ -772,7 +828,7 @@ bool DispModule::updateModule()
     }
 
     PROF_E
-    PROF_D(8)
+    PROF_D(10)
 
 
     // DEBUG: printing values from the disparity and depth maps
@@ -793,12 +849,6 @@ bool DispModule::updateModule()
         std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
     }
 
-
-//    double min, max;
-//    cv::minMaxLoc(outputDm, &min, &max);
-
-//    std::cout << "--## Min and max in disp: " << min << ", " << max << std::endl;
-
     if(this->debugWindow)
         this->gui.updateGUI();
 
@@ -812,7 +862,7 @@ bool DispModule::updateModule()
 
         std::cout << std::endl << "---- DISPMODULE: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
 
-        for(int i = 0; i < 9; i++)
+        for(int i = 0; i < debug_num_timings; i++)
         {
             std::cout << debug_strings[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
             this->debug_timings[i] = 0;

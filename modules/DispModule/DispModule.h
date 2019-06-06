@@ -323,8 +323,9 @@ class DispModule: public yarp::os::RFModule
     yarp::os::Mutex mutexDisp;
 
     // --- TEMP
-    int debug_timings[10];
+    int * debug_timings;
     int debug_count;
+    int debug_num_timings;
 
     Ptr<StereoSGBM> sgbm_temp;
     Ptr<DisparityWLSFilter> wls_filter;
@@ -359,6 +360,13 @@ class DispModule: public yarp::os::RFModule
     GUI gui;
 
     bool init;
+
+    STEREO_VISION BLFfiltering;
+    STEREO_VISION WLSfiltering;
+    STEREO_VISION stereo_matching;
+
+    Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
+    SGM_PARAMS cuda_params;
 
 public:
 

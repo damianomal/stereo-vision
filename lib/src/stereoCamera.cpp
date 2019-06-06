@@ -2744,3 +2744,85 @@ void StereoCamera::setExpectedPosition(Mat &Rot, Mat &Tran)
     R_exp=Rot;
     T_exp=Tran;
 }
+
+void StereoCamera::computeRightDisparity(bool best, int uniquenessRatio, int speckleWindowSize,
+                                         int speckleRange, int numberOfDisparities, int SADWindowSize,
+                                         int minDisparity, int preFilterCap, int disp12MaxDiff)
+{
+
+    Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(minDisparity,numberOfDisparities,SADWindowSize,
+                                                8*3*SADWindowSize*SADWindowSize,
+                                                32*3*SADWindowSize*SADWindowSize,
+                                                disp12MaxDiff,preFilterCap,uniquenessRatio,
+                                                speckleWindowSize,speckleRange,
+                                                best?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+
+    Ptr<StereoMatcher> right_matcher = createRightMatcher(sgbm);
+
+    right_matcher->compute(this->imgRightRect, this->imgLeftRect, this->right_disp);
+
+    Mat disp,disp8,map,dispTemp;
+    bool success;
+
+    this->right_disp.convertTo(map, CV_32FC1, 1.0,0.0);
+    map.convertTo(map,CV_32FC1,255/(numberOfDisparities*16.));
+    //normalize(map,map, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+
+    if (success)
+    {
+        if (cameraChanged)
+        {
+            this->mutex->wait();
+
+            Mat inverseMapL(map.rows*map.cols,1,CV_32FC2);
+            Mat inverseMapR(map.rows*map.cols,1,CV_32FC2);
+
+            for (int y=0; y<map.rows; y++)
+            {
+                for (int x=0; x<map.cols; x++)
+                {
+                    inverseMapL.ptr<float>(y*map.cols+x)[0]=(float)x;
+                    inverseMapL.ptr<float>(y*map.cols+x)[1]=(float)y;
+                    inverseMapR.ptr<float>(y*map.cols+x)[0]=(float)x;
+                    inverseMapR.ptr<float>(y*map.cols+x)[1]=(float)y;
+                }
+            }
+
+            undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
+            undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
+
+            Mat mapperL=inverseMapL.reshape(2,map.rows);
+            Mat mapperR=inverseMapR.reshape(2,map.rows);
+            this->MapperL=mapperL;
+            this->MapperR=mapperR;
+
+            this->mutex->post();
+
+            cameraChanged = false;
+        }
+
+        Mat x;
+
+        remap(map,dispTemp,this->MapperR,x,cv::INTER_LINEAR);
+        dispTemp.convertTo(disp8,CV_8U);
+
+//        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
+//        std::cout << disp.size() << std::endl;
+
+        if (use_elas)
+            disp.convertTo(disp, CV_16SC1, 16.0);
+    }
+
+    this->right_disp = disp8;
+    this->right_disp16 = disp;
+
+    success = true;
+
+}
+
+
+cv::Mat StereoCamera::getRightDisparity()
+{
+    return this->right_disp;
+}

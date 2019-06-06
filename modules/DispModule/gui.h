@@ -18,10 +18,24 @@
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 #include <stdio.h>
 #include <SDL.h>
 #include <iostream>
 
+
+enum STEREO_VISION {
+
+    BLF_DISABLED = 0,
+    BLF_ORIGINAL,
+    BLF_CUDA,
+    WLS_DISABLED,
+    WLS_ENABLED,
+    WLS_LRCHECK,
+    SGBM_OPENCV,
+    SGBM_CUDA,
+    LIBELAS
+};
 
 
 class GUI
@@ -50,9 +64,18 @@ private:
     float sigmaSpaceBLF;
     float wls_lambda;
     float wls_sigma;
-    bool useWLS;
-    bool useBLF;
-    bool left_right;
+//    bool useWLS;
+//    bool useBLF;
+//    bool left_right;
+
+    STEREO_VISION BLFfiltering;
+    STEREO_VISION WLSfiltering;
+    STEREO_VISION stereo_matching;
+
+    int BLFfiltering_id;
+    int WLSfiltering_id;
+    int stereo_matching_id;
+
 
 public:
 
@@ -65,7 +88,8 @@ public:
                                              int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                                              int speckleWindowSize, int speckleRange, double sigmaColorBLF,
                                              double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
-                                             bool useWls, bool left_right, bool useBLF);
+                                             STEREO_VISION BLFfiltering, STEREO_VISION WLSfiltering,
+                                             STEREO_VISION stereo_matching);
     void updateGUI();
     void setVal(int);
     int getVal();
@@ -73,13 +97,17 @@ public:
                    int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                    int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
                    double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                   bool& useWls, bool& left_right, bool& useBLF);
+                   STEREO_VISION& BLFfiltering, STEREO_VISION& WLSfiltering,
+                   STEREO_VISION& stereo_matching);
     bool isDone();
     bool isUpdated();
     void setUpdated(bool);
     void setUpdated(bool, bool);
 
     bool toRecalibrate();
+
+    void convertIDToEnum();
+    void convertEnumToID();
 };
 
 #endif // GUI_H

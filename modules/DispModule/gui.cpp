@@ -1,44 +1,8 @@
 #include "gui.h"
 
-//enum params{UNIQUENESS_RATIO,
-//            SPECKLEWINDOW,
-//            SADWINDOW,
-//            MINDISP,
-//            PREFILTERCAP,
-//            DISP12MAXDIFF,
-//            NUMDISPARITIES,
-//            BLFSIGMACOLOR,
-//            BLFSIGMASPACE};
-
-
-
-
-//this->uniquenessRatio=15;
-//this->speckleWindowSize=50;
-//this->speckleRange=16;
-//this->SADWindowSize=7;
-//this->minDisparity=0;
-//this->preFilterCap=63;
-//this->disp12MaxDiff=0;
-
-//this->numberOfDisparities = 96;
-
-//this->doBLF = !rf.check("skipBLF");
-//this->debugWindow = !rf.check("debug");
-
-//if(this->debugWindow)
-//    this->gui.initializeGUI();
-
-//cout << " Bilateral filter set to " << doBLF << endl;
-//this->sigmaColorBLF = 10.0;
-//this->sigmaSpaceBLF = 10.0;
-
-
 
 GUI::GUI()
 {
-//    this->io = ImGuiIO::GetIO();
-//    this->minDisp = 0;
     this->updated = false;
 }
 
@@ -51,7 +15,8 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                        int speckleWindowSize, int speckleRange, double sigmaColorBLF,
                        double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
-                       bool useWLS, bool left_right, bool useBLF)
+                       STEREO_VISION BLFfiltering, STEREO_VISION WLSfiltering,
+                       STEREO_VISION stereo_matching)
 {
 
     this->minDisparity = minDisparity;
@@ -66,9 +31,11 @@ int GUI::initializeGUI(int minDisparity, int numberOfDisparities, int SADWindowS
     this->sigmaSpaceBLF = sigmaSpaceBLF;
     this->wls_lambda = wls_lambda;
     this->wls_sigma = wls_sigma;
-    this->useWLS = useWLS;
-    this->left_right = left_right;
-    this->useBLF = useBLF;
+    this->BLFfiltering = BLFfiltering;
+    this->WLSfiltering = WLSfiltering;
+    this->stereo_matching = stereo_matching;
+
+    this->convertEnumToID();
 
     return GUI::initializeGUI();
 }
@@ -142,11 +109,6 @@ int GUI::initializeGUI()
         this->done = false;
 }
 
-//int GUI::getVal()
-//{
-//    return this->minDisp;
-//}
-
 void GUI::killGUI()
 {
     ImGui_ImplOpenGL3_Shutdown();
@@ -162,6 +124,7 @@ void GUI::updateGUI()
 {
 
     // GUI UPDATE
+
     SDL_Event event;
 
     this->updated = false;
@@ -176,11 +139,12 @@ void GUI::updateGUI()
     }
 
     // Start the Dear preFilterCapImGui frame
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame(this->window);
     ImGui::NewFrame();
 
-    // ------------------------------
+    // Stereo matching parameters
 
     this->updated |= ImGui::SliderInt("MinDisparity", &this->minDisparity, 0, 20);
 
@@ -191,39 +155,52 @@ void GUI::updateGUI()
     ImGui::Text("numberOfDisparities");
 
     this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
-
     this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 20);
-
     this->updated |= ImGui::SliderInt("preFilterCap", &this->preFilterCap, 0, 100);
-
     this->updated |= ImGui::SliderInt("uniquenessRatio", &this->uniquenessRatio, 5, 20);
 
-    this->updated |= ImGui::SliderInt("speckleWindowSize", &this->speckleWindowSize, 0, 200);
+    // Speckle filtering parameters
 
+    this->updated |= ImGui::SliderInt("speckleWindowSize", &this->speckleWindowSize, 0, 200);
     this->updated |= ImGui::SliderInt("speckleRange", &this->speckleRange, 1, 16);
 
-    this->updated |= ImGui::SliderFloat("sigmaColorBLF", &this->sigmaColorBLF, 1.0f, 20.0f, "%.2f");
+    // BLF filter parameters
 
+    this->updated |= ImGui::SliderFloat("sigmaColorBLF", &this->sigmaColorBLF, 1.0f, 20.0f, "%.2f");
     this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
 
-    this->updated |= ImGui::InputFloat("WLS lambda", &this->wls_lambda, 500, 1000, "%.1f");
+    // WLS filter parameters
 
+    this->updated |= ImGui::InputFloat("WLS lambda", &this->wls_lambda, 500, 1000, "%.1f");
     this->updated |= ImGui::InputFloat("WLS sigma", &this->wls_sigma, 0.1f, 0.5f, "%.2f");
 
+    // Alternatives for the stereo matching algorithm to be used
+
+    this->updated |= ImGui::RadioButton("SGBM", &this->stereo_matching_id, 0); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("CUDA SGBM", &this->stereo_matching_id, 1); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("LibElas", &this->stereo_matching_id, 2);
+
+    // Alternatives for the BLF filtering
+
+    this->updated |= ImGui::RadioButton("No BLF", &this->BLFfiltering_id, 0); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("Original BLF", &this->BLFfiltering_id, 1); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("CUDA BLF", &this->BLFfiltering_id, 2);
+
+    // Alternatives for the WLS filtering
+
+    this->updated |= ImGui::RadioButton("No WLS", &this->WLSfiltering_id, 0); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("WLS", &this->WLSfiltering_id, 1); ImGui::SameLine();
+    this->updated |= ImGui::RadioButton("WLS with l/r cons.", &this->WLSfiltering_id, 2);
+
+    // Button to trigger the recalibration of the camera
+
     this->recalibrate = ImGui::Button("Recalibrate"); ImGui::SameLine();
-
-    this->updated |= ImGui::Checkbox("Use WLS", &this->useWLS);  ImGui::SameLine();
-
-    this->updated |= ImGui::Checkbox("Use left-right cons.", &this->left_right);  ImGui::SameLine();
-
-    this->updated |= ImGui::Checkbox("Use BLF", &this->useBLF);
-
-
     this->updated |= this->recalibrate;
 
     // ------------------------------
 
     // Rendering
+
     ImGui::Render();
     SDL_GL_MakeCurrent(window, gl_context);
     glViewport(0, 0, (int)this->io.DisplaySize.x, (int)this->io.DisplaySize.y);
@@ -238,8 +215,11 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
                     int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                     int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
                     double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                    bool& useWLS, bool& left_right, bool& useBLF)
+                    STEREO_VISION& BLFfiltering, STEREO_VISION& WLSfiltering,
+                    STEREO_VISION& stereo_matching)
 {
+    this->convertIDToEnum();
+
     minDisparity = this->minDisparity;
     numberOfDisparities = this->numberOfDisparities;
     SADWindowSize = this->SADWindowSize;
@@ -252,9 +232,82 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     sigmaSpaceBLF = this->sigmaSpaceBLF;
     wls_lambda = this->wls_lambda;
     wls_sigma = this->wls_sigma;
-    useWLS = this->useWLS;
-    left_right = this->left_right;
-    useBLF = this->useBLF;
+    BLFfiltering = this->BLFfiltering;
+    WLSfiltering = this->WLSfiltering;
+    stereo_matching = this->stereo_matching;
+}
+
+void GUI::convertIDToEnum()
+{
+
+    switch(this->stereo_matching_id)
+    {
+        case 0:
+            this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+        case 1:
+            this->stereo_matching = STEREO_VISION::SGBM_CUDA;
+        case 2:
+            this->stereo_matching = STEREO_VISION::LIBELAS;
+    }
+
+    switch(this->BLFfiltering_id)
+    {
+        case 0:
+            this->BLFfiltering = STEREO_VISION::BLF_DISABLED;
+        case 1:
+            this->BLFfiltering = STEREO_VISION::BLF_ORIGINAL;
+        case 2:
+            this->BLFfiltering = STEREO_VISION::BLF_CUDA;
+    }
+
+    switch(this->WLSfiltering_id)
+    {
+        case 0:
+            this->WLSfiltering = STEREO_VISION::WLS_DISABLED;
+        case 1:
+            this->WLSfiltering = STEREO_VISION::WLS_ENABLED;
+        case 2:
+            this->WLSfiltering = STEREO_VISION::WLS_LRCHECK;
+    }
+
+}
+
+void GUI::convertEnumToID()
+{
+
+    switch(this->stereo_matching)
+    {
+        case STEREO_VISION::SGBM_OPENCV:
+            this->stereo_matching_id = 0;
+        case STEREO_VISION::SGBM_CUDA:
+            this->stereo_matching_id = 1;
+        case STEREO_VISION::LIBELAS:
+            this->stereo_matching_id = 2;
+
+    }
+
+    switch(this->BLFfiltering)
+    {
+        case STEREO_VISION::BLF_DISABLED:
+            this->BLFfiltering_id = 0;
+        case STEREO_VISION::BLF_ORIGINAL:
+            this->BLFfiltering_id = 1;
+        case STEREO_VISION::BLF_CUDA:
+            this->BLFfiltering_id = 2;
+
+    }
+
+    switch(this->WLSfiltering)
+    {
+        case STEREO_VISION::WLS_DISABLED:
+            this->WLSfiltering_id = 0;
+        case STEREO_VISION::WLS_ENABLED:
+            this->WLSfiltering_id = 1;
+        case STEREO_VISION::WLS_LRCHECK:
+            this->WLSfiltering_id = 2;
+
+    }
+
 }
 
 bool GUI::isDone()
