@@ -354,7 +354,7 @@ class DispModule: public yarp::os::RFModule
 
     void initializeStereoParams();
 
-    Mat depthFromDisparity(Mat disp, Mat Q);
+    Mat depthFromDisparity(Mat disp, Mat Q, Mat R);
 
 
     GUI gui;

@@ -244,7 +244,7 @@ bool DispModule::configure(ResourceFinder & rf)
 
 
     int radius = 7;
-    int iters = 1;
+    int iters = 2;
 
     pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
     pCudaBilFilter->setSigmaRange(sigmaColorBLF);
@@ -273,33 +273,29 @@ bool DispModule::configure(ResourceFinder & rf)
 //    return res;
 //}
 
-cv::Mat DispModule::depthFromDisparity(Mat disp, Mat Q)
+
+cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
 {
-//    yarp::sig::Vector xL, xR;
-//    yarp::sig::Vector o_temp;
 
-//    bool check = igaze->getLeftEyePose(xL, o_temp);
-//    check &= igaze->getRightEyePose(xR, o_temp);
+    cv::Mat repr, repr2;
 
-//    float baseline = norm(xL-xR);
+    repr = disparity.clone();
 
-//    cv::Mat depth;
+//    repr = disparity;
 
-//    disp.convertTo(depth, CV_32FC1);
+    repr.convertTo( repr, CV_16SC1, 1./16);
 
-//    cv::Mat res = (f * baseline) / (depth * disp.cols);
+//    repr /= 16.;
 
-//    return res;
-
-    cv::Mat repr;
-
-    disp /= 16;
-
-    reprojectImageTo3D(disp, repr, Q, false);
+    reprojectImageTo3D(repr, repr, Q, true);
     extractChannel(repr, repr, 2);
 
+//    repr *= 6;
+
     return repr;
+
 }
+
 
 
 void DispModule::initializeStereoParams()
@@ -603,6 +599,8 @@ bool DispModule::updateModule()
         this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
 
         cuda_init(&this->cuda_params);
+        pCudaBilFilter->setSigmaRange(sigmaColorBLF);
+        pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
 
         this->gui.setUpdated(false);
     }
@@ -711,7 +709,7 @@ bool DispModule::updateModule()
     PROF_D(7)
 
 
-    cv::Mat disp_wls;
+    cv::Mat disp_wls, disp_wls_2;
     Rect ROI;
     Ptr<DisparityWLSFilter> wls_filter;
 
@@ -741,6 +739,7 @@ bool DispModule::updateModule()
                 ROI = computeROI2(left_rect.size(),sgbm);
 
                 wls_filter->filter(disp_blf,left_rect,disp_wls,Mat(),ROI);
+                wls_filter->filter(outputDm,left_rect,disp_wls_2,Mat(),ROI);
 
                 break;
 
@@ -809,13 +808,20 @@ bool DispModule::updateModule()
 
             ImageOf<PixelFloat> &outim = outDepth.prepare();
 
-            if(this->useWLSfiltering)
-                outputDepth = this->depthFromDisparity(disp_wls, this->stereo->getQ());
+            if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
+            {
+                outputDepth = this->depthFromDisparity(disp_wls_2, this->stereo->getQ(), this->stereo->getRLrect());
+
+            }
             else
-                outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ());
+            {
+                if(this->stereo_matching == STEREO_VISION::SGBM_CUDA)
+                    outputDepth = this->depthFromDisparity(outputDm, this->stereo->getQ(), this->stereo->getRLrect());
+                else
+                    outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ(), this->stereo->getRLrect());
+             }
 
-
-//                threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
+//            threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
 
 //                threshold(outputDepth, outputDepth, 0., 0., CV_THRESH_TOZERO);
 //                cv::cvtColor(outputDepth, outputDepth,CV_32F);
@@ -833,7 +839,7 @@ bool DispModule::updateModule()
 //                cv::imshow("AA", cmm);
 //                cv::waitKey(1);
 
-//                outputDepth /= 10;
+//                outputDepth *= 10;
 
             outim = fromCvMat<PixelFloat>(outputDepth);
 
