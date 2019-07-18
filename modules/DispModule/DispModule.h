@@ -245,14 +245,11 @@ against OpenCV versions: 2.4.
 #include <iCub/iKin/iKinFwd.h>
 #include <iCub/stereoVision/stereoCamera.h>
 
-
-#include "opencv2/ximgproc/disparity_filter.hpp"
-
-#include "fastBilateral.hpp"
-
-#include "gui.h"
-
+//#include "opencv2/ximgproc/disparity_filter.hpp"
+//#include "fastBilateral.hpp"
+#include "cvgui.h"
 #include "common.h"
+#include "StereoMatcher.h"
 
 #ifdef USING_GPU
     #include <iCub/stereoVision/utils.h>
@@ -286,15 +283,10 @@ class DispModule: public yarp::os::RFModule
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > leftImgPort;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > rightImgPort;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > fakeEyesPort;
-//    BufferedPort<ImageOf<PixelRgbFloat> > worldCartPort;
-//    BufferedPort<ImageOf<PixelRgbFloat> > worldCylPort;
     Port handlerPort;
 
     BufferedPort<ImageOf<PixelFloat> > outDepth;
     BufferedPort<ImageOf<PixelMono> >  outDisp;
-
-//    BufferedPort<ImageOf<PixelRgb> >  outLeftRectImgPort;
-//    BufferedPort<ImageOf<PixelRgb> >  outRightRectImgPort;
 
     int numberOfTrials;
     string camCalibFile;
@@ -327,9 +319,9 @@ class DispModule: public yarp::os::RFModule
     int debug_count;
     int debug_num_timings;
 
-    Ptr<StereoSGBM> sgbm_temp;
-    Ptr<DisparityWLSFilter> wls_filter;
-    Ptr<StereoMatcher> right_matcher;
+//    Ptr<StereoSGBM> sgbm_temp;
+//    Ptr<DisparityWLSFilter> wls_filter;
+//    Ptr<StereoMatcher> right_matcher;
 
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
@@ -355,18 +347,24 @@ class DispModule: public yarp::os::RFModule
     void initializeStereoParams();
 
     Mat depthFromDisparity(Mat disp, Mat Q, Mat R);
+    Mat depthFromDisparity_alt(Mat disp, Mat Q, Mat R);
+
+    void handleGuiUpdate();
+    void recalibrate();
 
 
     GUI gui;
 
     bool init;
 
-    STEREO_VISION BLFfiltering;
-    STEREO_VISION WLSfiltering;
-    STEREO_VISION stereo_matching;
+    SM_BLF_FILTER BLFfiltering;
+    SM_WLS_FILTER WLSfiltering;
+    SM_MATCHING_ALG stereo_matching;
 
-    Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
+//    Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
     SGM_PARAMS cuda_params, params_right;
+
+    StereoMatcherNew * matcher;
 
 public:
 
@@ -375,6 +373,7 @@ public:
     bool configure(ResourceFinder &rf);
     bool close();
     bool updateModule();
+    bool updateModule_new();
     double getPeriod();
     bool interruptModule();
     bool respond(const Bottle& command, Bottle& reply);
@@ -388,6 +387,7 @@ public:
 //    Point3f get3DPointMatch(double u1, double v1, double u2, double v2, const string &drive="LEFT");
     Point2f projectPoint(const string &camera, double x, double y, double z);
 
+    DispModule();
     ~DispModule();
 
 };

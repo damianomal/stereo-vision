@@ -22,10 +22,15 @@
 #include "DispModule.h"
 
 // --- DEBUG
-#include <chrono>
-#define PROF_S {start = std::chrono::high_resolution_clock::now();}
-#define PROF_E {stop = std::chrono::high_resolution_clock::now();}
-#define PROF_D(N) {duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); this->debug_timings[N] += duration.count();}
+//#include <chrono>
+//#define PROF_S {start = std::chrono::high_resolution_clock::now();}
+//#define PROF_E {stop = std::chrono::high_resolution_clock::now();}
+//#define PROF_D(N) {duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); this->debug_timings[N] += duration.count();}
+
+#define PROF_S
+#define PROF_E
+#define PROF_D
+
 
 char const *debug_strings[] = {
     "updateViaKinematics",
@@ -42,10 +47,6 @@ char const *debug_strings[] = {
 };
 
 using namespace yarp::cv;
-
-#include "common.h"
-#include "sgbm_cuda_header.h"
-
 
 bool DispModule::configure(ResourceFinder & rf)
 {
@@ -108,30 +109,30 @@ bool DispModule::configure(ResourceFinder & rf)
 
 
     if (rf.check("sgbm"))
-        this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     else if(rf.check("sgbm_cuda"))
-        this->stereo_matching = STEREO_VISION::SGBM_CUDA;
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
     else if(rf.check("libelas"))
     {
-        this->stereo_matching = STEREO_VISION::LIBELAS;
+        this->stereo_matching = SM_MATCHING_ALG::LIBELAS;
         this->stereo->initELAS(rf);
     }
     else
-        this->stereo_matching = STEREO_VISION::SGBM_OPENCV;
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
 
     if (rf.check("blf"))
-        this->BLFfiltering = STEREO_VISION::BLF_ORIGINAL;
+        this->BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
     else if(rf.check("blf_cuda"))
-        this->BLFfiltering = STEREO_VISION::BLF_CUDA;
+        this->BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
     else
-        this->BLFfiltering = STEREO_VISION::BLF_DISABLED;
+        this->BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
 
     if (rf.check("wls"))
-        this->WLSfiltering = STEREO_VISION::WLS_ENABLED;
+        this->WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
     else if(rf.check("wls_lr"))
-        this->WLSfiltering = STEREO_VISION::WLS_LRCHECK;
+        this->WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
     else
-        this->WLSfiltering = STEREO_VISION::WLS_DISABLED;
+        this->WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
 
 
     this->debugWindow = !rf.check("debug");
@@ -226,73 +227,80 @@ bool DispModule::configure(ResourceFinder & rf)
         this->debug_timings[i] = 0;
 
 
-    this->cuda_params.preFilterCap = this->preFilterCap;
-    this->cuda_params.BlockSize = this->SADWindowSize;
-    this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-    this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
+//    this->cuda_params.preFilterCap = this->preFilterCap;
+//    this->cuda_params.BlockSize = this->SADWindowSize;
+//    this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
+//    this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
+//    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
+//    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
 
-    cuda_init(&this->cuda_params);
+//    cuda_init(&this->cuda_params);
 
-    this->params_right.preFilterCap = this->preFilterCap;
-    this->params_right.BlockSize = this->SADWindowSize;
-    this->params_right.P1 = 8 * this->params_right.BlockSize * this->params_right.BlockSize;
-    this->params_right.P2 = 32 * this->params_right.BlockSize * this->params_right.BlockSize;
-    this->params_right.uniquenessRatio = 0;
-    this->params_right.disp12MaxDiff = 1000000;
+//    this->params_right.preFilterCap = this->preFilterCap;
+//    this->params_right.BlockSize = this->SADWindowSize;
+//    this->params_right.P1 = 8 * this->params_right.BlockSize * this->params_right.BlockSize;
+//    this->params_right.P2 = 32 * this->params_right.BlockSize * this->params_right.BlockSize;
+//    this->params_right.uniquenessRatio = 0;
+//    this->params_right.disp12MaxDiff = 1000000;
 
+//    int radius = 7;
+//    int iters = 2;
 
-    int radius = 7;
-    int iters = 2;
+//    pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
+//    pCudaBilFilter->setSigmaRange(sigmaColorBLF);
 
-    pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
-    pCudaBilFilter->setSigmaRange(sigmaColorBLF);
-
+    this->matcher = new StereoMatcherNew(rf, this->stereo);
+    this->matcher->initCUDAParams();
 
     return true;
 
 }
 
-//cv::Mat DispModule::depthFromDisparity(Mat disp, float f, int numDisp)
-//{
-//    yarp::sig::Vector xL, xR;
-//    yarp::sig::Vector o_temp;
-
-//    bool check = igaze->getLeftEyePose(xL, o_temp);
-//    check &= igaze->getRightEyePose(xR, o_temp);
-
-//    float baseline = norm(xL-xR);
-
-//    cv::Mat depth;
-
-//    disp.convertTo(depth, CV_32FC1);
-
-//    cv::Mat res = (f * baseline) / (depth * disp.cols);
-
-//    return res;
-//}
-
-
 cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
 {
 
-    cv::Mat repr, repr2;
+    cv::Mat repr;
 
     repr = disparity.clone();
-
-//    repr = disparity;
-
-    repr.convertTo( repr, CV_16SC1, 1./16);
-
-//    repr /= 16.;
+    repr.convertTo(repr, CV_32FC1, 1./16);
 
     reprojectImageTo3D(repr, repr, Q, true);
+
+    // TODO: missing rotation given RLRect
+
     extractChannel(repr, repr, 2);
 
-//    repr *= 6;
-
     return repr;
+
+}
+
+
+cv::Mat DispModule::depthFromDisparity_alt(Mat disparity, Mat Q, Mat R)
+{
+
+    cv::Mat depth;
+
+    depth = disparity.clone();
+
+    depth.convertTo(depth, CV_32FC1, 1./16.);
+
+    float r02 = float(R.at<double>(0,2));
+    float r12 = float(R.at<double>(1,2));
+    float r22 = float(R.at<double>(2,2));
+
+    float q00 = float(Q.at<double>(0,0));
+    float q03 = float(Q.at<double>(0,3));
+    float q11 = float(Q.at<double>(1,1));
+    float q13 = float(Q.at<double>(1,3));
+    float q23 = float(Q.at<double>(2,3));
+    float q32 = float(Q.at<double>(3,2));
+    float q33 = float(Q.at<double>(3,3));
+
+    for (int u = 0; u < depth.rows; u++)
+        for (int v = 0; v < depth.cols; v++)
+            depth.at<float>(u,v) = (r02*(float(u)*q00+q03)+r12*(float(v)*q11+q13)+r22*q23)/(depth.at<float>(u,v)*q32+q33);
+
+    return depth;
 
 }
 
@@ -412,50 +420,611 @@ bool DispModule::close()
 #endif
 
     delete stereo;
+    delete &gui;
 
     return true;
 }
 
-Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
+//Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
 
-
-//Rect getB(cv::Mat disp, int th)
+//Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
 //{
+//    int min_disparity = matcher_instance->getMinDisparity();
+//    int num_disparities = matcher_instance->getNumDisparities();
+//    int block_size = matcher_instance->getBlockSize();
 
+//    int bs2 = block_size/2;
+//    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
+
+//    int xmin = maxD + bs2;
+//    int xmax = src_sz.width + minD - bs2;
+//    int ymin = bs2;
+//    int ymax = src_sz.height - bs2;
+
+//    Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
+
+//    return r;
 //}
-
-Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
-{
-    int min_disparity = matcher_instance->getMinDisparity();
-    int num_disparities = matcher_instance->getNumDisparities();
-    int block_size = matcher_instance->getBlockSize();
-
-    int bs2 = block_size/2;
-    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
-
-    int xmin = maxD + bs2;
-    int xmax = src_sz.width + minD - bs2;
-    int ymin = bs2;
-    int ymax = src_sz.height - bs2;
-
-    Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
-//    std::cout << "roi:" << r << std::endl;
-    return r;
-}
-
-
-//Ptr<StereoSGBM> right_sgbm = StereoSGBM::create(-(min_disp+num_disp)+1,num_disp,wsize);
-//right_sgbm->setUniquenessRatio(0);
-//right_sgbm->setP1(sgbm->getP1());
-//right_sgbm->setP2(sgbm->getP2());
-//right_sgbm->setMode(sgbm->getMode());
-//right_sgbm->setPreFilterCap(sgbm->getPreFilterCap());
-//right_sgbm->setDisp12MaxDiff(1000000);
-//right_sgbm->setSpeckleWindowSize(0);
-//return right_sgbm;
 
 
 /******************************************************************************/
+
+
+void DispModule::recalibrate()
+{
+
+#ifdef USING_GPU
+        utils->extractMatch_GPU(leftMat,rightMat);
+        vector<Point2f> leftM,rightM;
+        utils->getMatches(leftM,rightM);
+        mutexDisp.lock();
+        this->stereo->setMatches(leftM,rightM);
+#else
+
+        mutexDisp.lock();
+        stereo->findMatch(false);
+#endif
+        stereo->estimateEssential();
+        bool ok=stereo->essentialDecomposition();
+        mutexDisp.unlock();
+
+        if (ok)
+        {
+            calibUpdated=true;
+            doSFM=false;
+            calibEndEvent.signal();
+
+            R0=stereo->getRotation();
+            T0=stereo->getTranslation();
+            eyes0=eyes;
+
+            std::cout << "Calibration Successful!" << std::endl;
+
+        }
+        else
+        {
+            if (++numberOfTrials>5)
+            {
+                calibUpdated=false;
+                doSFM=false;
+                calibEndEvent.signal();
+
+                std::cout << "Calibration failed after 5 trials.. Please show a non planar scene." << std::endl;
+
+            }
+        }
+
+}
+
+void DispModule::handleGuiUpdate()
+{
+
+    if(this->gui.toRecalibrate())
+    {
+        std::cout << "Updating..." << std::endl;
+
+        mutexRecalibration.lock();
+        numberOfTrials=0;
+        doSFM=true;
+        mutexRecalibration.unlock();
+
+        this->gui.setUpdated(false, false);
+    }
+    else
+    {
+//        this->cuda_params.preFilterCap = this->preFilterCap;
+//        this->cuda_params.BlockSize = this->SADWindowSize;
+//        this->cuda_params.uniquenessRatio = this->uniquenessRatio;
+//        this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
+
+//        cuda_init(&this->cuda_params);
+//        pCudaBilFilter->setSigmaRange(sigmaColorBLF);
+//        pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
+
+        this->matcher->updateCUDAParams();
+        this->gui.setUpdated(false);
+
+    }
+
+}
+
+bool DispModule::updateModule()
+{
+    ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
+    ImageOf<PixelRgb> *yarp_imgR=rightImgPort.read(true);
+
+//    auto start = std::chrono::high_resolution_clock::now();
+//    auto stop = std::chrono::high_resolution_clock::now();
+//    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
+    std::cout << std::setprecision(2) << std::fixed;
+
+    Stamp stamp_left, stamp_right;
+    leftImgPort.getEnvelope(stamp_left);
+    rightImgPort.getEnvelope(stamp_right);
+
+    if ((yarp_imgL==NULL) || (yarp_imgR==NULL))
+        return true;
+
+    // read encoders
+    iencs->getEncoder(nHeadAxes-3,&eyes[0]);
+    iencs->getEncoder(nHeadAxes-2,&eyes[1]);
+    iencs->getEncoder(nHeadAxes-1,&eyes[2]);
+
+//    PROF_S
+
+    updateViaKinematics(eyes-eyes0);
+
+//    PROF_E
+//    PROF_D(0)
+
+//    PROF_S
+
+    updateViaGazeCtrl(false);
+
+//    PROF_E
+//    PROF_D(1)
+
+    leftMat=toCvMat(*yarp_imgL);
+    rightMat=toCvMat(*yarp_imgR);
+
+    //DEBUG
+
+    getCameraHGazeCtrl(LEFT);
+    getCameraHGazeCtrl(RIGHT);
+
+//    PROF_S
+
+    this->stereo->setImages(leftMat,rightMat);
+
+//    PROF_E
+//    PROF_D(2)
+//    PROF_S
+
+    if(this->gui.isUpdated())
+        this->handleGuiUpdate();
+
+//    if(this->gui.isUpdated() && this->gui.toRecalibrate())
+//    {
+//        std::cout << "Updating..." << std::endl;
+
+//        mutexRecalibration.lock();
+//        numberOfTrials=0;
+//        doSFM=true;
+//        mutexRecalibration.unlock();
+
+//        this->gui.setUpdated(false, false);
+//    }
+
+//    PROF_E
+//    PROF_D(3)
+//    PROF_S
+
+    mutexRecalibration.lock();
+
+
+
+//    if (doSFM)
+//    {
+//#ifdef USING_GPU
+//        utils->extractMatch_GPU(leftMat,rightMat);
+//        vector<Point2f> leftM,rightM;
+//        utils->getMatches(leftM,rightM);
+//        mutexDisp.lock();
+//        this->stereo->setMatches(leftM,rightM);
+//#else
+
+//        mutexDisp.lock();
+//        this->stereo->findMatch(false);
+//#endif
+//        this->stereo->estimateEssential();
+//        bool ok=this->stereo->essentialDecomposition();
+//        mutexDisp.unlock();
+
+//        if (ok)
+//        {
+//            calibUpdated=true;
+//            doSFM=false;
+//            calibEndEvent.signal();
+
+//            R0=this->stereo->getRotation();
+//            T0=this->stereo->getTranslation();
+//            eyes0=eyes;
+
+//            std::cout << "Calibration Successful!" << std::endl;
+
+//        }
+//        else
+//        {
+//            if (++numberOfTrials>5)
+//            {
+//                calibUpdated=false;
+//                doSFM=false;
+//                calibEndEvent.signal();
+
+//                std::cout << "Calibration failed after 5 trials.. Please show a non planar scene." << std::endl;
+
+//            }
+//        }
+//    }
+
+    if(doSFM)
+        this->recalibrate();
+
+    mutexRecalibration.unlock();
+
+//    PROF_E
+//    PROF_D(4)
+
+//    PROF_S
+
+//    if(this->gui.isUpdated())
+//    {
+
+//        this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
+//                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
+//                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
+//                            this->wls_lambda, this->wls_sigma, this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
+
+//        this->cuda_params.preFilterCap = this->preFilterCap;
+//        this->cuda_params.BlockSize = this->SADWindowSize;
+//        this->cuda_params.uniquenessRatio = this->uniquenessRatio;
+//        this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
+
+//        cuda_init(&this->cuda_params);
+//        pCudaBilFilter->setSigmaRange(sigmaColorBLF);
+//        pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
+
+//        this->gui.setUpdated(false);
+//    }
+
+//    PROF_E
+//    PROF_D(5)
+
+//    cv::Mat grayL, grayR;
+
+//    PROF_S
+
+    mutexDisp.lock();
+
+//    switch(this->stereo_matching)
+//    {
+//        case STEREO_VISION::SGBM_OPENCV:
+//        case STEREO_VISION::LIBELAS:
+
+//            this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+//                        this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+//                        this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+
+//            outputDm = stereo->getDisparity();
+
+//            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
+//                this->stereo->computeRightDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
+//                                                    this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
+//                                                    this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
+
+//            break;
+
+//        case STEREO_VISION::SGBM_CUDA:
+
+//            this->stereo->rectifyImages();
+
+//            grayL = this->stereo->getLRectified();
+//            grayR = this->stereo->getRRectified();
+
+//            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+//            cv::cvtColor(grayR, grayR, CV_BGR2GRAY);
+
+//            outputDm = zy_remap(grayL, grayR);
+
+//            // DEBUG: NOT WORKING
+
+//            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
+//            {
+
+//                cuda_init(&this->params_right);
+
+//                cv::Mat outputDm_r = zy_remap(grayR, grayL);
+
+//                this->stereo->setRightDisparity(outputDm_r);
+
+//                cuda_init(&cuda_params);
+//            }
+
+//            break;
+
+//        default:
+
+//            throw std::runtime_error(std::string("Wrong stereo_matching value."));
+//    }
+
+    matcher->compute();
+
+    mutexDisp.unlock();
+
+//    PROF_E
+//    PROF_D(6)
+
+//    cv::Mat disp_blf;
+//    cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
+
+//    PROF_S
+
+    matcher->filterBLF("base");
+
+//    switch(this->BLFfiltering)
+//    {
+//        case STEREO_VISION::BLF_ORIGINAL:
+
+//            cv_extend::bilateralFilter(outputDm, disp_blf, sigmaColorBLF, sigmaSpaceBLF);
+
+//            break;
+
+//        case STEREO_VISION::BLF_CUDA:
+
+//            grayL = this->stereo->getLRectified();
+//            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+//            imageGpu.upload(grayL);
+//            gpuDisp.upload(outputDm);
+
+//            pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+//            filtGpu.download(disp_blf);
+
+//            break;
+
+//        case STEREO_VISION::BLF_DISABLED:
+//        default:
+
+//            disp_blf = outputDm;
+
+//            break;
+//    }
+
+//    PROF_E
+//    PROF_D(7)
+
+
+//    cv::Mat disp_wls, disp_wls_2;
+//    Rect ROI;
+//    Ptr<DisparityWLSFilter> wls_filter;
+
+//    PROF_S
+
+    matcher->filterWLS("blf");
+
+//    if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
+//    {
+
+//        Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
+//                                                    8*3*this->SADWindowSize*this->SADWindowSize,
+//                                                    32*3*this->SADWindowSize*this->SADWindowSize,
+//                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
+//                                                    this->speckleWindowSize, this->speckleRange,
+//                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+
+//        cv::Mat left_rect = this->stereo->getLRectified();
+
+//        switch(this->WLSfiltering)
+//        {
+//            case STEREO_VISION::WLS_ENABLED:
+
+//                wls_filter = createDisparityWLSFilterGeneric(false);
+
+//                wls_filter->setLambda(this->wls_lambda);
+//                wls_filter->setSigmaColor(this->wls_sigma);
+//                wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
+//                ROI = computeROI2(left_rect.size(),sgbm);
+
+//                wls_filter->filter(disp_blf,left_rect,disp_wls,Mat(),ROI);
+//                wls_filter->filter(outputDm,left_rect,disp_wls_2,Mat(),ROI);
+
+//                break;
+
+//            case STEREO_VISION::WLS_LRCHECK:
+
+//                if(this->stereo_matching == STEREO_VISION::SGBM_OPENCV)
+//                {
+//                    wls_filter = createDisparityWLSFilter(sgbm);
+
+//                    wls_filter->setLambda(wls_lambda);
+//                    wls_filter->setSigmaColor(wls_sigma);
+
+////                    std::cout << this->stereo->getRightDisparity().channels() << std::endl;
+////                    std::cout << this->stereo->getRightDisparity().size << std::endl;
+////                    std::cout << this->stereo->getRightDisparity().rows << std::endl;
+////                    std::cout << this->stereo->getRightDisparity().cols << std::endl;
+
+//                    wls_filter->filter(disp_blf,left_rect,disp_wls,this->stereo->getRightDisparity());
+//                }
+//                else
+//                    disp_wls = disp_blf;
+
+//                break;
+
+//            default:
+
+//                break;
+//        }
+//    }
+//    else
+//        disp_wls = disp_blf;
+
+
+//    PROF_E
+//    PROF_D(8)
+
+
+//    PROF_S
+
+    cv::Mat disp_vis = matcher->getDisparity("base");
+
+    if (outDisp.getOutputCount()>0 && !disp_vis.empty())
+    {
+        ImageOf<PixelMono> &outim = outDisp.prepare();
+
+        if(this->stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
+            getDisparityVis(disp_vis, disp_vis, 3);
+
+        outim = fromCvMat<PixelMono>(disp_vis);
+        outDisp.write();
+    }
+
+//    PROF_E
+//    PROF_D(9)
+
+
+//    PROF_S
+
+
+    if (outDepth.getOutputCount()>0)
+    {
+        cv::Mat disp_depth = matcher->getDisparity("base");
+
+        if (disp_depth.empty())
+        {
+            std::cout << "!!! Impossible to compute the depth map: disparity is not available" << std::endl;
+        }
+        else
+        {
+
+            outputDepth = this->depthFromDisparity_alt(disp_depth, this->stereo->getQ(), this->stereo->getRLrect());
+
+            ImageOf<PixelFloat> &outim = outDepth.prepare();
+
+//            if(this->WLSfiltering != SM_WLS_FILTER::WLS_DISABLED)
+//            {
+//                outputDepth = this->depthFromDisparity_alt(disp_wls_2, this->stereo->getQ(), this->stereo->getRLrect());
+//            }
+//            else
+//            {
+//                if(this->stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
+//                {
+
+//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_ORIGINAL)
+//                        cv_extend::bilateralFilter(outputDm, outputDm, sigmaColorBLF, sigmaSpaceBLF);
+
+//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_CUDA)
+//                    {
+//                        grayL = this->stereo->getLRectified();
+//                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+//                        imageGpu.upload(grayL);
+//                        gpuDisp.upload(outputDm);
+
+//                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+//                        filtGpu.download(outputDm);
+//                    }
+
+//                    outputDepth = this->depthFromDisparity_alt(outputDm, this->stereo->getQ(), this->stereo->getRLrect());
+//                }
+//                else
+//                {
+
+//                    cv::Mat d = this->stereo->getDisparity16();
+
+//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_ORIGINAL)
+//                        cv_extend::bilateralFilter(d, d, sigmaColorBLF, sigmaSpaceBLF);
+
+//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_CUDA)
+//                    {
+//                        grayL = this->stereo->getLRectified();
+//                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+//                        imageGpu.upload(grayL);
+//                        gpuDisp.upload(d);
+
+//                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+//                        filtGpu.download(d);
+//                    }
+
+
+//                    outputDepth = this->depthFromDisparity_alt(d, this->stereo->getQ(), this->stereo->getRLrect());
+//                }
+//            }
+
+
+//            threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
+
+//                threshold(outputDepth, outputDepth, 0., 0., CV_THRESH_TOZERO);
+//                cv::cvtColor(outputDepth, outputDepth,CV_32F);
+
+//                getDisparityVis(outputDepth, outputDepth, 25);
+
+//                cv::Mat cmm, cm2;
+
+//                cv::cvtColor(outputDepth, cm2, CV_8UC1);
+
+//                applyColorMap(outputDepth, cmm, COLORMAP_AUTUMN);
+
+
+//                cv::namedWindow("AA");
+//                cv::imshow("AA", cmm);
+//                cv::waitKey(1);
+
+//                outputDepth *= 10;
+
+//            std::cout << "FFF" << std::endl;
+
+            outim = fromCvMat<PixelFloat>(outputDepth);
+
+//            std::cout << "GGG" << std::endl;
+
+            outDepth.write();
+
+        }
+
+    }
+
+//    PROF_E
+//    PROF_D(10)
+
+
+    // DEBUG: printing values from the disparity and depth maps
+
+//    if(!outputDm.empty())
+//    {
+//        std::cout << "------------------" << std::endl;
+
+//        double min, max;
+//        cv::minMaxLoc(disp_wls, &min, &max);
+//        std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
+//    }
+
+//    if(!outputDepth.empty())
+//    {
+//        double min, max;
+//        cv::minMaxLoc(outputDepth, &min, &max);
+//        std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
+//    }
+
+    if(this->debugWindow)
+        this->gui.updateGUI();
+
+    if(this->gui.isDone())
+        this->gui.killGUI();
+
+//    if(++debug_count == 100)
+//    {
+
+//        std::cout << std::endl << "---- DISPMODULE: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
+
+//        for(int i = 0; i < this->debug_num_timings; i++)
+//        {
+//            std::cout << debug_strings[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
+//            this->debug_timings[i] = 0;
+//        }
+
+//        debug_count = 0;
+//    }
+
+    return true;
+}
+
+/*
 bool DispModule::updateModule()
 {
     ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
@@ -784,7 +1353,7 @@ bool DispModule::updateModule()
         ImageOf<PixelMono> &outim = outDisp.prepare();
 
         if(this->stereo_matching == STEREO_VISION::SGBM_CUDA)
-            getDisparityVis(disp_wls, disp_wls, 2);
+            getDisparityVis(disp_wls, disp_wls, 3);
 
         outim = fromCvMat<PixelMono>(disp_wls);
         outDisp.write();
@@ -810,16 +1379,57 @@ bool DispModule::updateModule()
 
             if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
             {
-                outputDepth = this->depthFromDisparity(disp_wls_2, this->stereo->getQ(), this->stereo->getRLrect());
-
+                outputDepth = this->depthFromDisparity_alt(disp_wls_2, this->stereo->getQ(), this->stereo->getRLrect());
             }
             else
             {
                 if(this->stereo_matching == STEREO_VISION::SGBM_CUDA)
-                    outputDepth = this->depthFromDisparity(outputDm, this->stereo->getQ(), this->stereo->getRLrect());
+                {
+
+                    if(this->BLFfiltering == STEREO_VISION::BLF_ORIGINAL)
+                        cv_extend::bilateralFilter(outputDm, outputDm, sigmaColorBLF, sigmaSpaceBLF);
+
+                    if(this->BLFfiltering == STEREO_VISION::BLF_CUDA)
+                    {
+                        grayL = this->stereo->getLRectified();
+                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+                        imageGpu.upload(grayL);
+                        gpuDisp.upload(outputDm);
+
+                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+                        filtGpu.download(outputDm);
+                    }
+
+                    outputDepth = this->depthFromDisparity_alt(outputDm, this->stereo->getQ(), this->stereo->getRLrect());
+                }
                 else
-                    outputDepth = this->depthFromDisparity(this->stereo->getDisparity16(), this->stereo->getQ(), this->stereo->getRLrect());
-             }
+                {
+
+                    cv::Mat d = this->stereo->getDisparity16();
+
+                    if(this->BLFfiltering == STEREO_VISION::BLF_ORIGINAL)
+                        cv_extend::bilateralFilter(d, d, sigmaColorBLF, sigmaSpaceBLF);
+
+                    if(this->BLFfiltering == STEREO_VISION::BLF_CUDA)
+                    {
+                        grayL = this->stereo->getLRectified();
+                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
+
+                        imageGpu.upload(grayL);
+                        gpuDisp.upload(d);
+
+                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
+
+                        filtGpu.download(d);
+                    }
+
+
+                    outputDepth = this->depthFromDisparity_alt(d, this->stereo->getQ(), this->stereo->getRLrect());
+                }
+            }
+
 
 //            threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
 
@@ -841,7 +1451,12 @@ bool DispModule::updateModule()
 
 //                outputDepth *= 10;
 
+//            std::cout << "FFF" << std::endl;
+
+
             outim = fromCvMat<PixelFloat>(outputDepth);
+
+//            std::cout << "GGG" << std::endl;
 
             outDepth.write();
 
@@ -855,14 +1470,14 @@ bool DispModule::updateModule()
 
     // DEBUG: printing values from the disparity and depth maps
 
-    if(!outputDm.empty())
-    {
-        std::cout << "------------------" << std::endl;
+//    if(!outputDm.empty())
+//    {
+//        std::cout << "------------------" << std::endl;
 
-        double min, max;
-        cv::minMaxLoc(disp_wls, &min, &max);
-        std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
-    }
+//        double min, max;
+//        cv::minMaxLoc(disp_wls, &min, &max);
+//        std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
+//    }
 
 //    if(!outputDepth.empty())
 //    {
@@ -893,7 +1508,7 @@ bool DispModule::updateModule()
 
     return true;
 }
-
+*/
 
 /******************************************************************************/
 double DispModule::getPeriod()
@@ -1262,7 +1877,8 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         reply.addString("- [uL_1 vL_1 uR_1 vR_1 ... uL_n vL_n uR_n vR_n]: Given n quadruples uL_i vL_i uR_i vR_i, where uL_i vL_i are the pixel coordinates in the Left image and uR_i vR_i are the coordinates of the matched pixel in the Right image, the response is a set of 3D points (X1 Y1 Z1 ... Xn Yn Zn) wrt the ROOT reference system.");
         reply.addString("- [cart2stereo X Y Z]: Given a world point X Y Z wrt to ROOT reference frame the response is the projection (uL vL uR vR) in the Left and Right images.");
         reply.addString("- [doBLF flag]: activate Bilateral filter for flag = true, and skip it for flag = false.");
-        reply.addString("- [bilatfilt sigmaColor sigmaSpace]: Set the parameters for the bilateral filer (default sigmaColor = 10.0, sigmaSpace = 10.0 .");
+        reply.addString("- [bilatfilt sigmaColor sigmaSpace]: Set the parameters for the bilateral filer (default sigmaColor = 10.0, sigmaSpace = 10.0).");
+        reply.addString("- [algorithm name]: Set the stereo matching algorithm used (default = SGMB(cpu)).");
         reply.addString("For more details on the commands, check the module's documentation");
         return true;
     }
@@ -1474,6 +2090,11 @@ DispModule::~DispModule()
         this->gui.killGUI();
 }
 
+DispModule::DispModule()
+{
+
+}
+
 /******************************************************************************/
 int main(int argc, char *argv[])
 {
@@ -1495,5 +2116,4 @@ int main(int argc, char *argv[])
 
     return mod.runModule(rf);
 }
-
 
