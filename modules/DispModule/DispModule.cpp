@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (C) 2015 RobotCub Consortium
  * Author: Sean Ryan Fanello, Giulia Pasquale
  * email:   sean.fanello@iit.it giulia.pasquale@iit.it
@@ -35,7 +35,7 @@
 char const *debug_strings[] = {
     "updateViaKinematics",
     "updateViaGazeCtrl",
-    "getCameraHGazeCtrlx2",
+    "getCameraHGazkillGUIeCtrlx2",
     "gui.recalibrate",
     "doSFM",
     "gui.isUpdated",
@@ -48,11 +48,11 @@ char const *debug_strings[] = {
 
 using namespace yarp::cv;
 
+/******************************************************************************/
 bool DispModule::configure(ResourceFinder & rf)
 {
 
-//    if(rf.check("640"))
-//        rf.setDefaultConfigFile("icubEyes_640x480.ini");
+    // populate local variables with infos from the context
 
     string name=rf.check("name",Value("SFM")).asString();
     string robot=rf.check("robot",Value("icub")).asString();
@@ -60,16 +60,19 @@ bool DispModule::configure(ResourceFinder & rf)
     string right=rf.check("rightPort",Value("/right:i")).asString();
     string SFMFile=rf.check("SFMFile",Value("SFM.ini")).asString();
 
-    string sname;
-    sname="/"+name;
+    string sname="/"+name;
     left=sname+left;
     right=sname+right;
 
-    string outDispName=rf.check("outDispPort",Value("/disp:o")).asString();
-    string outDepthName=rf.check("outNamePort",Value("/depth:o")).asString();
+    // set up output disparity and depth ports
 
-//    string outLeftRectImgPortName=rf.check("outLeftRectImgPort",Value("/rect_left:o")).asString();
-//    string outRightRectImgPortName=rf.check("outRightRectImgPort",Value("/rect_right:o")).asString();
+    string outDispName=rf.check("outDispPort",Value("/disp:o")).asString();
+    string outDepthName=rf.check("outDepthPort",Value("/depth:o")).asString();
+
+    outDepthName=sname+outDepthName;
+    outDispName=sname+outDispName;
+
+    // load the calibration infos from file
 
     ResourceFinder localCalibration;
     localCalibration.setDefaultContext("cameraCalibration");
@@ -79,14 +82,11 @@ bool DispModule::configure(ResourceFinder & rf)
     this->camCalibFile=localCalibration.getHomeContextPath();
     this->camCalibFile+="/"+SFMFile;
 
-    outDepthName=sname+outDepthName;
-    outDispName=sname+outDispName;
+    //
 
     string rpc_name=sname+"/rpc";
-//    string world_name=sname+rf.check("outWorldPort",Value("/world")).asString();
 
-    int calib=rf.check("useCalibrated",Value(1)).asInt();
-    bool useCalibrated=(calib!=0);
+    // open the ports
 
     leftImgPort.open(left);
     rightImgPort.open(right);
@@ -94,6 +94,9 @@ bool DispModule::configure(ResourceFinder & rf)
     outDisp.open(outDispName);
     handlerPort.open(rpc_name);
     attach(handlerPort);
+
+    // create the stereocamera and load the
+    // intrinsic/extrinsic parameters
 
     this->stereo = new StereoCamera(true);
 
@@ -105,50 +108,18 @@ bool DispModule::configure(ResourceFinder & rf)
 
     stereo->setIntrinsics(KL,KR,DistL,DistR);
 
+    // initialize local stereo parameters
+
     this->initializeStereoParams();
 
-
-    if (rf.check("sgbm"))
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
-    else if(rf.check("sgbm_cuda"))
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
-    else if(rf.check("libelas"))
-    {
-        this->stereo_matching = SM_MATCHING_ALG::LIBELAS;
-        this->stereo->initELAS(rf);
-    }
-    else
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
-
-    if (rf.check("blf"))
-        this->BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
-    else if(rf.check("blf_cuda"))
-        this->BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
-    else
-        this->BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
-
-    if (rf.check("wls"))
-        this->WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
-    else if(rf.check("wls_lr"))
-        this->WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
-    else
-        this->WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
-
-
-    this->debugWindow = !rf.check("debug");
-
-    if(this->debugWindow)
-    {
-        this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
-                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
-                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
-                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
-                            this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
-    }
-
+    //
 
     this->HL_root=Mat::zeros(4,4,CV_64F);
     this->HR_root=Mat::zeros(4,4,CV_64F);
+
+    bool useCalibrated = rf.check("useCalibrated");
+
+    // TODO: check whether this part next is needed or not
 
     if (useCalibrated)
     {
@@ -158,6 +129,10 @@ bool DispModule::configure(ResourceFinder & rf)
         this->stereo->setIntrinsics(KL,KR,zeroDist,zeroDist);
     }
 
+    std::cout << "[DEBUG] UseCalibrated: " << useCalibrated << std::endl;
+
+    //
+
     init=true;
     numberOfTrials=0;
 
@@ -165,6 +140,8 @@ bool DispModule::configure(ResourceFinder & rf)
     utils=new Utilities();
     utils->initSIFT_GPU();
 #endif
+
+    //
 
     Property optionHead;
     optionHead.put("device","remote_controlboard");
@@ -178,15 +155,15 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else if (this->usePorts)
     {
-//        string fakeEyes=rf.check("fakeEyesPort",Value("/fakeEyes:i")).asString();
-//        fakeEkesPort.open(fakeEyes);
-//        =rf.check("rightPort",Value("/right:i")).asString();
+        // TODO: to be implemented
     }
     else
     {
         cout<<"Devices not available"<<endl;
         return false;
     }
+
+    // set up to interface with the GazeController
 
     Property optionGaze;
     optionGaze.put("device","gazecontrollerclient");
@@ -200,6 +177,8 @@ bool DispModule::configure(ResourceFinder & rf)
         headCtrl.close();
         return false;
     }
+
+    // set up the translation and rotation parameters of the stereo system
 
     if (!R0.empty() && !T0.empty())
     {
@@ -217,8 +196,53 @@ bool DispModule::configure(ResourceFinder & rf)
     doSFM=false;
     updateViaGazeCtrl(false);
 
-    this->debug_count = 0;
+    // select the stereo matching algorithm, filtering
+    // methods on the basis of the parameters the
+    // module has been invoked with
 
+    if (rf.check("sgbm"))
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+    else if(rf.check("sgbm_cuda"))
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
+    else if(rf.check("libelas"))
+        this->stereo_matching = SM_MATCHING_ALG::LIBELAS;
+    else
+        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+
+    if (rf.check("blf"))
+        this->BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
+    else if(rf.check("blf_cuda"))
+        this->BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
+    else
+        this->BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
+
+    if (rf.check("wls"))
+        this->WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
+    else if(rf.check("wls_lr"))
+        this->WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
+    else
+        this->WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
+
+    // if specified via CMake, compile using the GUI
+    // based on cvui.h and here checks whether to initialize
+    // it or not
+
+#ifdef USE_GUI
+    this->debugWindow = rf.check("debug");
+
+    if(this->debugWindow)
+    {
+        this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
+                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
+                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
+                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
+                            this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
+    }
+#endif
+
+    //TODO: debug prints, remove them
+
+    this->debug_count = 0;
     this->debug_num_timings = 11;
 
     debug_timings = new int[debug_num_timings];
@@ -226,56 +250,41 @@ bool DispModule::configure(ResourceFinder & rf)
     for(int i = 0; i < debug_num_timings; i++)
         this->debug_timings[i] = 0;
 
-
-//    this->cuda_params.preFilterCap = this->preFilterCap;
-//    this->cuda_params.BlockSize = this->SADWindowSize;
-//    this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-//    this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-//    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-//    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
-
-//    cuda_init(&this->cuda_params);
-
-//    this->params_right.preFilterCap = this->preFilterCap;
-//    this->params_right.BlockSize = this->SADWindowSize;
-//    this->params_right.P1 = 8 * this->params_right.BlockSize * this->params_right.BlockSize;
-//    this->params_right.P2 = 32 * this->params_right.BlockSize * this->params_right.BlockSize;
-//    this->params_right.uniquenessRatio = 0;
-//    this->params_right.disp12MaxDiff = 1000000;
-
-//    int radius = 7;
-//    int iters = 2;
-
-//    pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
-//    pCudaBilFilter->setSigmaRange(sigmaColorBLF);
+    // initialize the StereoMatcher object
 
     this->matcher = new StereoMatcherNew(rf, this->stereo);
-    this->matcher->initCUDAParams();
+    this->matcher->updateCUDAParams();
+    this->matcher->setParameters(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
+                                 this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
+                                 this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
+                                 this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
+                                 this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
 
     return true;
 
 }
 
+/******************************************************************************/
+//cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
+//{
+
+//    cv::Mat repr;
+
+//    repr = disparity.clone();
+//    repr.convertTo(repr, CV_32FC1, 1./16);
+
+//    reprojectImageTo3D(repr, repr, Q, true);
+
+//    // TODO: missing rotation given RLRect
+
+//    extractChannel(repr, repr, 2);
+
+//    return repr;
+
+//}
+
+/******************************************************************************/
 cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
-{
-
-    cv::Mat repr;
-
-    repr = disparity.clone();
-    repr.convertTo(repr, CV_32FC1, 1./16);
-
-    reprojectImageTo3D(repr, repr, Q, true);
-
-    // TODO: missing rotation given RLRect
-
-    extractChannel(repr, repr, 2);
-
-    return repr;
-
-}
-
-
-cv::Mat DispModule::depthFromDisparity_alt(Mat disparity, Mat Q, Mat R)
 {
 
     cv::Mat depth;
@@ -304,8 +313,7 @@ cv::Mat DispModule::depthFromDisparity_alt(Mat disparity, Mat Q, Mat R)
 
 }
 
-
-
+/******************************************************************************/
 void DispModule::initializeStereoParams()
 {
     this->useBestDisp=true;
@@ -415,41 +423,20 @@ bool DispModule::close()
     headCtrl.close();
     gazeCtrl.close();
 
+    delete stereo;
+
 #ifdef USING_GPU
     delete utils;
 #endif
 
-    delete stereo;
+#ifdef USE_GUI
     delete &gui;
+#endif
 
     return true;
 }
 
-//Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
-
-//Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
-//{
-//    int min_disparity = matcher_instance->getMinDisparity();
-//    int num_disparities = matcher_instance->getNumDisparities();
-//    int block_size = matcher_instance->getBlockSize();
-
-//    int bs2 = block_size/2;
-//    int minD = min_disparity, maxD = min_disparity + num_disparities - 1;
-
-//    int xmin = maxD + bs2;
-//    int xmax = src_sz.width + minD - bs2;
-//    int ymin = bs2;
-//    int ymax = src_sz.height - bs2;
-
-//    Rect r(xmin, ymin, xmax - xmin, ymax - ymin);
-
-//    return r;
-//}
-
-
 /******************************************************************************/
-
-
 void DispModule::recalibrate()
 {
 
@@ -496,6 +483,8 @@ void DispModule::recalibrate()
 
 }
 
+/******************************************************************************/
+#ifdef USE_GUI
 void DispModule::handleGuiUpdate()
 {
 
@@ -512,24 +501,20 @@ void DispModule::handleGuiUpdate()
     }
     else
     {
-//        this->cuda_params.preFilterCap = this->preFilterCap;
-//        this->cuda_params.BlockSize = this->SADWindowSize;
-//        this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-//        this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
-
-//        cuda_init(&this->cuda_params);
-//        pCudaBilFilter->setSigmaRange(sigmaColorBLF);
-//        pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
-
         this->matcher->updateCUDAParams();
         this->gui.setUpdated(false);
 
     }
 
 }
+#endif
 
+/******************************************************************************/
 bool DispModule::updateModule()
 {
+
+    // acquire the left and right images
+
     ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
     ImageOf<PixelRgb> *yarp_imgR=rightImgPort.read(true);
 
@@ -537,7 +522,7 @@ bool DispModule::updateModule()
 //    auto stop = std::chrono::high_resolution_clock::now();
 //    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
-    std::cout << std::setprecision(2) << std::fixed;
+//    std::cout << std::setprecision(2) << std::fixed;
 
     Stamp stamp_left, stamp_right;
     leftImgPort.getEnvelope(stamp_left);
@@ -547,318 +532,92 @@ bool DispModule::updateModule()
         return true;
 
     // read encoders
+
     iencs->getEncoder(nHeadAxes-3,&eyes[0]);
     iencs->getEncoder(nHeadAxes-2,&eyes[1]);
     iencs->getEncoder(nHeadAxes-1,&eyes[2]);
 
-//    PROF_S
+    //
 
     updateViaKinematics(eyes-eyes0);
 
-//    PROF_E
-//    PROF_D(0)
-
-//    PROF_S
+    //
 
     updateViaGazeCtrl(false);
 
-//    PROF_E
-//    PROF_D(1)
 
     leftMat=toCvMat(*yarp_imgL);
     rightMat=toCvMat(*yarp_imgR);
 
-    //DEBUG
+    // updates left/right eyes pose
 
     getCameraHGazeCtrl(LEFT);
     getCameraHGazeCtrl(RIGHT);
 
-//    PROF_S
+    // stores the images in the StereoCamera object
 
     this->stereo->setImages(leftMat,rightMat);
 
-//    PROF_E
-//    PROF_D(2)
-//    PROF_S
+    std::cout << "LOOP - GuiUpdate\n";
 
-    if(this->gui.isUpdated())
+#ifdef USE_GUI
+    if(this->debugWindow && this->gui.isUpdated())
         this->handleGuiUpdate();
-
-//    if(this->gui.isUpdated() && this->gui.toRecalibrate())
-//    {
-//        std::cout << "Updating..." << std::endl;
-
-//        mutexRecalibration.lock();
-//        numberOfTrials=0;
-//        doSFM=true;
-//        mutexRecalibration.unlock();
-
-//        this->gui.setUpdated(false, false);
-//    }
-
-//    PROF_E
-//    PROF_D(3)
-//    PROF_S
+#endif
 
     mutexRecalibration.lock();
 
-
-
-//    if (doSFM)
-//    {
-//#ifdef USING_GPU
-//        utils->extractMatch_GPU(leftMat,rightMat);
-//        vector<Point2f> leftM,rightM;
-//        utils->getMatches(leftM,rightM);
-//        mutexDisp.lock();
-//        this->stereo->setMatches(leftM,rightM);
-//#else
-
-//        mutexDisp.lock();
-//        this->stereo->findMatch(false);
-//#endif
-//        this->stereo->estimateEssential();
-//        bool ok=this->stereo->essentialDecomposition();
-//        mutexDisp.unlock();
-
-//        if (ok)
-//        {
-//            calibUpdated=true;
-//            doSFM=false;
-//            calibEndEvent.signal();
-
-//            R0=this->stereo->getRotation();
-//            T0=this->stereo->getTranslation();
-//            eyes0=eyes;
-
-//            std::cout << "Calibration Successful!" << std::endl;
-
-//        }
-//        else
-//        {
-//            if (++numberOfTrials>5)
-//            {
-//                calibUpdated=false;
-//                doSFM=false;
-//                calibEndEvent.signal();
-
-//                std::cout << "Calibration failed after 5 trials.. Please show a non planar scene." << std::endl;
-
-//            }
-//        }
-//    }
+    std::cout << "LOOP - Recalibrate\n";
 
     if(doSFM)
         this->recalibrate();
 
     mutexRecalibration.unlock();
 
-//    PROF_E
-//    PROF_D(4)
-
-//    PROF_S
-
-//    if(this->gui.isUpdated())
-//    {
-
-//        this->gui.getParams(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
-//                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
-//                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF, this->sigmaSpaceBLF,
-//                            this->wls_lambda, this->wls_sigma, this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
-
-//        this->cuda_params.preFilterCap = this->preFilterCap;
-//        this->cuda_params.BlockSize = this->SADWindowSize;
-//        this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-//        this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
-
-//        cuda_init(&this->cuda_params);
-//        pCudaBilFilter->setSigmaRange(sigmaColorBLF);
-//        pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
-
-//        this->gui.setUpdated(false);
-//    }
-
-//    PROF_E
-//    PROF_D(5)
-
-//    cv::Mat grayL, grayR;
-
-//    PROF_S
-
     mutexDisp.lock();
 
-//    switch(this->stereo_matching)
-//    {
-//        case STEREO_VISION::SGBM_OPENCV:
-//        case STEREO_VISION::LIBELAS:
+    std::cout << "LOOP - compute disp\n";
 
-//            this->stereo->computeDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-//                        this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-//                        this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
-
-//            outputDm = stereo->getDisparity();
-
-//            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
-//                this->stereo->computeRightDisparity(this->useBestDisp,this->uniquenessRatio,this->speckleWindowSize,
-//                                                    this->speckleRange,this->numberOfDisparities,this->SADWindowSize,
-//                                                    this->minDisparity,this->preFilterCap,this->disp12MaxDiff);
-
-//            break;
-
-//        case STEREO_VISION::SGBM_CUDA:
-
-//            this->stereo->rectifyImages();
-
-//            grayL = this->stereo->getLRectified();
-//            grayR = this->stereo->getRRectified();
-
-//            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-//            cv::cvtColor(grayR, grayR, CV_BGR2GRAY);
-
-//            outputDm = zy_remap(grayL, grayR);
-
-//            // DEBUG: NOT WORKING
-
-//            if(this->WLSfiltering == STEREO_VISION::WLS_LRCHECK)
-//            {
-
-//                cuda_init(&this->params_right);
-
-//                cv::Mat outputDm_r = zy_remap(grayR, grayL);
-
-//                this->stereo->setRightDisparity(outputDm_r);
-
-//                cuda_init(&cuda_params);
-//            }
-
-//            break;
-
-//        default:
-
-//            throw std::runtime_error(std::string("Wrong stereo_matching value."));
-//    }
+    // compute the current disparity map
 
     matcher->compute();
 
     mutexDisp.unlock();
 
-//    PROF_E
-//    PROF_D(6)
+    std::cout << "LOOP - filter blf\n";
 
-//    cv::Mat disp_blf;
-//    cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
-
-//    PROF_S
+    // execute the bilateral filtering of the
+    // disparity map, if selected
 
     matcher->filterBLF("base");
 
-//    switch(this->BLFfiltering)
-//    {
-//        case STEREO_VISION::BLF_ORIGINAL:
+    std::cout << "LOOP - filter wls\n";
 
-//            cv_extend::bilateralFilter(outputDm, disp_blf, sigmaColorBLF, sigmaSpaceBLF);
-
-//            break;
-
-//        case STEREO_VISION::BLF_CUDA:
-
-//            grayL = this->stereo->getLRectified();
-//            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-
-//            imageGpu.upload(grayL);
-//            gpuDisp.upload(outputDm);
-
-//            pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
-
-//            filtGpu.download(disp_blf);
-
-//            break;
-
-//        case STEREO_VISION::BLF_DISABLED:
-//        default:
-
-//            disp_blf = outputDm;
-
-//            break;
-//    }
-
-//    PROF_E
-//    PROF_D(7)
-
-
-//    cv::Mat disp_wls, disp_wls_2;
-//    Rect ROI;
-//    Ptr<DisparityWLSFilter> wls_filter;
-
-//    PROF_S
+    // execute the WLS filtering, if selected
 
     matcher->filterWLS("blf");
 
-//    if(this->WLSfiltering != STEREO_VISION::WLS_DISABLED)
-//    {
+    std::cout << "LOOP - before disp_vis\n";
 
-//        Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-//                                                    8*3*this->SADWindowSize*this->SADWindowSize,
-//                                                    32*3*this->SADWindowSize*this->SADWindowSize,
-//                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-//                                                    this->speckleWindowSize, this->speckleRange,
-//                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+    // gets the (possibly) blf-filtered disparity map
 
-//        cv::Mat left_rect = this->stereo->getLRectified();
+    cv::Mat disp_vis = matcher->getDisparity("blf");
 
-//        switch(this->WLSfiltering)
-//        {
-//            case STEREO_VISION::WLS_ENABLED:
+    // TODO: DEBUG, removed
 
-//                wls_filter = createDisparityWLSFilterGeneric(false);
+    std::cout << disp_vis.size() << std::endl;
+    std::cout << disp_vis.empty() << std::endl;
 
-//                wls_filter->setLambda(this->wls_lambda);
-//                wls_filter->setSigmaColor(this->wls_sigma);
-//                wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
-//                ROI = computeROI2(left_rect.size(),sgbm);
+    double src_min, src_max;
+    cv::minMaxLoc(disp_vis, &src_min, &src_max);
 
-//                wls_filter->filter(disp_blf,left_rect,disp_wls,Mat(),ROI);
-//                wls_filter->filter(outputDm,left_rect,disp_wls_2,Mat(),ROI);
+    std::cout << src_min << std::endl;
+    std::cout << src_max << std::endl;
 
-//                break;
+    std::cout << "LOOP - after disp_vis\n";
 
-//            case STEREO_VISION::WLS_LRCHECK:
-
-//                if(this->stereo_matching == STEREO_VISION::SGBM_OPENCV)
-//                {
-//                    wls_filter = createDisparityWLSFilter(sgbm);
-
-//                    wls_filter->setLambda(wls_lambda);
-//                    wls_filter->setSigmaColor(wls_sigma);
-
-////                    std::cout << this->stereo->getRightDisparity().channels() << std::endl;
-////                    std::cout << this->stereo->getRightDisparity().size << std::endl;
-////                    std::cout << this->stereo->getRightDisparity().rows << std::endl;
-////                    std::cout << this->stereo->getRightDisparity().cols << std::endl;
-
-//                    wls_filter->filter(disp_blf,left_rect,disp_wls,this->stereo->getRightDisparity());
-//                }
-//                else
-//                    disp_wls = disp_blf;
-
-//                break;
-
-//            default:
-
-//                break;
-//        }
-//    }
-//    else
-//        disp_wls = disp_blf;
-
-
-//    PROF_E
-//    PROF_D(8)
-
-
-//    PROF_S
-
-    cv::Mat disp_vis = matcher->getDisparity("base");
+    // if the disparity output port is active, sends
+    // the current (filtered) one
 
     if (outDisp.getOutputCount()>0 && !disp_vis.empty())
     {
@@ -871,16 +630,15 @@ bool DispModule::updateModule()
         outDisp.write();
     }
 
-//    PROF_E
-//    PROF_D(9)
+    std::cout << "LOOP - after disp output\n";
 
-
-//    PROF_S
-
+    // if the output port is active, computes the depth
+    // map for the current disparity map (the filtered one,
+    // in case the bilateral filtering is selected)
 
     if (outDepth.getOutputCount()>0)
     {
-        cv::Mat disp_depth = matcher->getDisparity("base");
+        cv::Mat disp_depth = matcher->getDisparity("blf");
 
         if (disp_depth.empty())
         {
@@ -889,137 +647,32 @@ bool DispModule::updateModule()
         else
         {
 
-            outputDepth = this->depthFromDisparity_alt(disp_depth, this->stereo->getQ(), this->stereo->getRLrect());
+            outputDepth = this->depthFromDisparity(disp_depth, this->stereo->getQ(), this->stereo->getRLrect());
 
             ImageOf<PixelFloat> &outim = outDepth.prepare();
 
-//            if(this->WLSfiltering != SM_WLS_FILTER::WLS_DISABLED)
-//            {
-//                outputDepth = this->depthFromDisparity_alt(disp_wls_2, this->stereo->getQ(), this->stereo->getRLrect());
-//            }
-//            else
-//            {
-//                if(this->stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
-//                {
-
-//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_ORIGINAL)
-//                        cv_extend::bilateralFilter(outputDm, outputDm, sigmaColorBLF, sigmaSpaceBLF);
-
-//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_CUDA)
-//                    {
-//                        grayL = this->stereo->getLRectified();
-//                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-
-//                        imageGpu.upload(grayL);
-//                        gpuDisp.upload(outputDm);
-
-//                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
-
-//                        filtGpu.download(outputDm);
-//                    }
-
-//                    outputDepth = this->depthFromDisparity_alt(outputDm, this->stereo->getQ(), this->stereo->getRLrect());
-//                }
-//                else
-//                {
-
-//                    cv::Mat d = this->stereo->getDisparity16();
-
-//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_ORIGINAL)
-//                        cv_extend::bilateralFilter(d, d, sigmaColorBLF, sigmaSpaceBLF);
-
-//                    if(this->BLFfiltering == SM_BLF_FILTER::BLF_CUDA)
-//                    {
-//                        grayL = this->stereo->getLRectified();
-//                        cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-
-//                        imageGpu.upload(grayL);
-//                        gpuDisp.upload(d);
-
-//                        pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
-
-//                        filtGpu.download(d);
-//                    }
-
-
-//                    outputDepth = this->depthFromDisparity_alt(d, this->stereo->getQ(), this->stereo->getRLrect());
-//                }
-//            }
-
-
-//            threshold(outputDepth, outputDepth, 10., 10., CV_THRESH_TRUNC);
-
-//                threshold(outputDepth, outputDepth, 0., 0., CV_THRESH_TOZERO);
-//                cv::cvtColor(outputDepth, outputDepth,CV_32F);
-
-//                getDisparityVis(outputDepth, outputDepth, 25);
-
-//                cv::Mat cmm, cm2;
-
-//                cv::cvtColor(outputDepth, cm2, CV_8UC1);
-
-//                applyColorMap(outputDepth, cmm, COLORMAP_AUTUMN);
-
-
-//                cv::namedWindow("AA");
-//                cv::imshow("AA", cmm);
-//                cv::waitKey(1);
-
-//                outputDepth *= 10;
-
-//            std::cout << "FFF" << std::endl;
-
             outim = fromCvMat<PixelFloat>(outputDepth);
 
-//            std::cout << "GGG" << std::endl;
-
             outDepth.write();
-
         }
-
     }
 
-//    PROF_E
-//    PROF_D(10)
+    std::cout << "LOOP - after depth output\n";
 
+    // if the GUI is used, handles the interaction
+    // with it and updates its state
 
-    // DEBUG: printing values from the disparity and depth maps
-
-//    if(!outputDm.empty())
-//    {
-//        std::cout << "------------------" << std::endl;
-
-//        double min, max;
-//        cv::minMaxLoc(disp_wls, &min, &max);
-//        std::cout << "DEBUG: min, max for disparity map: " << min << ", " << max << std::endl;
-//    }
-
-//    if(!outputDepth.empty())
-//    {
-//        double min, max;
-//        cv::minMaxLoc(outputDepth, &min, &max);
-//        std::cout << "DEBUG: min, max for depth map: " << min << ", " << max << std::endl;
-//    }
-
-    if(this->debugWindow)
+#ifdef USE_GUI
+    if(this->debugWindow && !this->gui.isDone())
         this->gui.updateGUI();
+
+    std::cout << "LOOP - after gui update\n";
 
     if(this->gui.isDone())
         this->gui.killGUI();
+#endif
 
-//    if(++debug_count == 100)
-//    {
-
-//        std::cout << std::endl << "---- DISPMODULE: AVERAGE TIMING OVER " << debug_count << " FRAMES ----" << std::endl;
-
-//        for(int i = 0; i < this->debug_num_timings; i++)
-//        {
-//            std::cout << debug_strings[i] << ": " << (this->debug_timings[i] / debug_count) / 1000. << " ms" << std::endl;
-//            this->debug_timings[i] = 0;
-//        }
-
-//        debug_count = 0;
-//    }
+    std::cout << "LOOP - after gui everything\n";
 
     return true;
 }
@@ -1518,7 +1171,6 @@ double DispModule::getPeriod()
     return 0.0;
 }
 
-
 /******************************************************************************/
 bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes)
 {
@@ -1551,7 +1203,6 @@ bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, 
 
     return true;
 }
-
 
 /******************************************************************************/
 bool DispModule::loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL,
@@ -2077,22 +1728,27 @@ Point2f DispModule::projectPoint(const string &camera, double x, double y, doubl
     if(camera=="left")
         response=this->stereo->projectPoints3D("left",points3D,HL_root);
     else
-        response=this->stereo->projectPoints3D("right",points3D,HL_root);
+        response=this->stereo->projectPoints3D("right",points3D,HL_root); // this should be HR_root
 
     mutexDisp.unlock();
 
     return response[0];
 }
 
+/******************************************************************************/
 DispModule::~DispModule()
 {
+#ifdef USE_GUI
     if(this->debugWindow)
         this->gui.killGUI();
+#endif
+
 }
 
+/******************************************************************************/
 DispModule::DispModule()
 {
-
+    // TODO
 }
 
 /******************************************************************************/

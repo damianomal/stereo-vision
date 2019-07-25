@@ -245,9 +245,11 @@ against OpenCV versions: 2.4.
 #include <iCub/iKin/iKinFwd.h>
 #include <iCub/stereoVision/stereoCamera.h>
 
-//#include "opencv2/ximgproc/disparity_filter.hpp"
-//#include "fastBilateral.hpp"
-#include "cvgui.h"
+
+#ifdef USE_GUI
+    #include "cvgui.h"
+#endif
+
 #include "common.h"
 #include "StereoMatcher.h"
 
@@ -271,7 +273,7 @@ using namespace cv::ximgproc;
 class DispModule: public yarp::os::RFModule
 {
     StereoCamera* stereo;
-    Mat           outputDm, outputDepth;
+    Mat outputDm, outputDepth;
     Mat leftMat, rightMat;
 
 #ifdef USING_GPU
@@ -285,11 +287,18 @@ class DispModule: public yarp::os::RFModule
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > fakeEyesPort;
     Port handlerPort;
 
+    // output YARP ports
+
     BufferedPort<ImageOf<PixelFloat> > outDepth;
     BufferedPort<ImageOf<PixelMono> >  outDisp;
 
+    //
+
     int numberOfTrials;
     string camCalibFile;
+
+    // stereo matching parameters
+
     bool useBestDisp;
     int uniquenessRatio;
     int speckleWindowSize;
@@ -314,14 +323,12 @@ class DispModule: public yarp::os::RFModule
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
 
-    // --- TEMP
+    // --- TEMP: used for debugging
     int * debug_timings;
     int debug_count;
     int debug_num_timings;
 
-//    Ptr<StereoSGBM> sgbm_temp;
-//    Ptr<DisparityWLSFilter> wls_filter;
-//    Ptr<StereoMatcher> right_matcher;
+    //
 
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
@@ -332,28 +339,130 @@ class DispModule: public yarp::os::RFModule
     Mat HR_root;
     Mat R0,T0;
 
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param rf XXXXXXXXXXXXXXX
+    * @param KL XXXXXXXXXXXXXXX
+    * @param KR XXXXXXXXXXXXXXX
+    * @param DistL XXXXXXXXXXXXXXX
+    * @param DistR XXXXXXXXXXXXXXX
+    * @return XXXXXXXXXXXXXXX
+    *
+    */
     bool loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL, Mat &DistR);
+
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param R XXXXXXXXXXXXXXX
+    * @param T XXXXXXXXXXXXXXX
+    * @return XXXXXXXXXXXXXXX
+    *
+    */
     Mat buildRotTras(const Mat& R, const Mat& T);
+
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param camera XXXXXXXXXXXXXXX
+    * @return XXXXXXXXXXXXXXX
+    *
+    */
     Matrix getCameraHGazeCtrl(int camera);
+
+    /**
+    * Converts a matrix from YARP format to OpenCV format
+    * @param matrix Input YARP matrix
+    * @param mat Output cv::Mat object
+    *
+    */
     void convert(Matrix& matrix, Mat& mat);
+
+    /**
+    * Converts a matrix from OpenCV formato to YARP format
+    * @param mat Input cv::Mat object
+    * @param matrix Output YARP matrix
+    *
+    */
     void convert(Mat& mat, Matrix& matrix);
 //    void fillWorld3D(ImageOf<PixelRgbFloat> &worldCartImg, ImageOf<PixelRgbFloat> &worldCylImg);
 //    void floodFill(const Point &seed,const Point3f &p0, const double dist, set<int> &visited, Bottle &res);
+
+    /**
+    * Loads the extrinsics parameters of the camera system, via the ResourceFinder
+    * @param rf The ResourceFinder object
+    * @param Ro The rotation of the right eye with respect to the left one
+    * @param To The translation of the right eye with respect to the left one
+    * @param eyes xXXXXXXXXXXXx
+    * @return
+    *
+    */
     bool loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
+
+    /**
+    * Updates the extrinsics parameters within the local configuration file
+    * @param Rot XXXXXXXXXXXXXXX
+    * @param Tr XXXXXXXXXXXXXXX
+    * @param eyes XXXXXXXXXXXXXXX
+    * @param groupname XXXXXXXXXXXXXXX
+    * @return
+    *
+    */
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
+
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param update XXXXXXXXXXXXXXX
+    *
+    */
     void updateViaGazeCtrl(const bool update);
+
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param deyes XXXXXXXXXXXXXXX
+    *
+    */
     void updateViaKinematics(const yarp::sig::Vector& deyes);
 
+    /**
+    * Initializes the parameters used by the stereo matching algorithms.
+    *
+    */
     void initializeStereoParams();
 
+    /**
+    * Computes the depth map starting from the disparity map
+    * @param disp The disparity map
+    * @param Q The transformation matrix resulting from the rectification process
+    * @param R The rectification trasform for the left camera
+    * @return A matrix containing the depth values associated with every point in the disparity map
+    *
+    */
     Mat depthFromDisparity(Mat disp, Mat Q, Mat R);
-    Mat depthFromDisparity_alt(Mat disp, Mat Q, Mat R);
 
+//    /**
+//    * Computes the depth map starting from the disparity map
+//    * @param disp The disparity map
+//    * @param Q The transformation matrix resulting from the rectification process
+//    * @param R The rectification trasform for the left camera
+//    * @return A matrix containing the depth values associated with every point in the disparity map
+//    *
+//    */
+//    Mat depthFromDisparity_alt(Mat disp, Mat Q, Mat R);
+
+    /**
+    * Checks the status of the GUI, and if there are additional operations to carry out
+    *
+    */
     void handleGuiUpdate();
+
+    /**
+    * Run the calibration process for the stereo camera
+    *
+    */
     void recalibrate();
 
-
+#ifdef USE_GUI
     GUI gui;
+#endif
 
     bool init;
 
@@ -361,30 +470,70 @@ class DispModule: public yarp::os::RFModule
     SM_WLS_FILTER WLSfiltering;
     SM_MATCHING_ALG stereo_matching;
 
-//    Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
     SGM_PARAMS cuda_params, params_right;
 
     StereoMatcherNew * matcher;
 
 public:
 
-    cv::Mat dispT;
+//    cv::Mat dispT;
+
+    //
 
     bool configure(ResourceFinder &rf);
     bool close();
     bool updateModule();
-    bool updateModule_new();
     double getPeriod();
     bool interruptModule();
     bool respond(const Bottle& command, Bottle& reply);
 
+    /**
+    * ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+    * @param PARNAME XXXXXXXXXXXXXXXXXXXXX
+    * @param PARNAME XXXXXXXXXXXXXXXXXXXXX
+    * @param PARNAME XXXXXXXXXXXXXXXXXXXXX
+    * @return XXXXXXXXXXXX
+    *
+    */
     void setDispParameters(bool _useBestDisp, int _uniquenessRatio, int _speckleWindowSize,
                            int _speckleRange, int _numberOfDisparities, int _SADWindowSize,
                            int _minDisparity, int _preFilterCap, int _disp12MaxDiff);
+
+    /**
+    * Calculates the 3D coordinates for a point (u,v) with respect to a specified reference frame
+    * @param u X coordinate of the point on the image plane
+    * @param v Y coordinate of the point on the image plane
+    * @param drive Reference frame considered for this calculation
+    * @return The 3D point representing corresponding to the (u,v) 2D point
+    *
+    */
     Point3f get3DPoints(int u, int v, const string &drive="LEFT");
-    Point3f get3DPointsAndDisp(int u, int v, int &uR, int &vR, const string &drive);
+
+    // TODO: the next method has been removed
+
+//    /**
+//    * ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+//    * @param u XXXXXXXXXXXXXXXXXXXXX
+//    * @param v XXXXXXXXXXXXXXXXXXXXX
+//    * @param uR XXXXXXXXXXXXXXXXXXXXX
+//    * @param vR XXXXXXXXXXXXXXXXXXXXX
+//    * @param drive XXXXXXXXXXXXXXXXXXXXX
+//    * @return XXXXXXXXXXXX
+//    *
+//    */
+//    Point3f get3DPointsAndDisp(int u, int v, int &uR, int &vR, const string &drive);
 
 //    Point3f get3DPointMatch(double u1, double v1, double u2, double v2, const string &drive="LEFT");
+
+    /**
+    * Projects a 3D point onto one of the two image planes
+    * @param camera Camera plane to project the point to, can be "left" or "right"
+    * @param x First coordinate of the 3D point
+    * @param y Second coordinate of the 3D point
+    * @param z Third coordinate of the 3D point
+    * @return The 2D Coordinates of the projected point, on the selected image plane
+    *
+    */
     Point2f projectPoint(const string &camera, double x, double y, double z);
 
     DispModule();

@@ -12,7 +12,26 @@
 
 #include "opencv2/ximgproc/disparity_filter.hpp"
 
-#include "StereoMatcher_enums.h"
+//#include "StereoMatcher_enums.h"
+
+enum SM_MATCHING_ALG {
+    SGBM_OPENCV = 0,
+    SGBM_CUDA,
+    LIBELAS
+};
+
+enum SM_BLF_FILTER {
+    BLF_ORIGINAL = 0,
+    BLF_CUDA,
+    BLF_DISABLED
+};
+
+enum SM_WLS_FILTER {
+    WLS_DISABLED = 0,
+    WLS_ENABLED,
+    WLS_LRCHECK
+};
+
 
 
 //enum SM_MATCHING_ALG {
@@ -53,29 +72,40 @@ private:
 
     StereoCamera * stereo;
 
-//    cv::Mat disp, disp16;
+    // base disparity
 
     cv::Mat disparity;
     cv::Mat disparity16;
 
+    // disparity after blf filtering
+
     cv::Mat disparity_blf;
     cv::Mat disparity16_blf;
+
+    // disparity after wls filtering
 
     cv::Mat disparity_wls;
     cv::Mat disparity16_wls;
 
-//    SGM_PARAMS cuda_params;
+    // selections for the different methods
+    // used to carry out the processing
 
     SM_MATCHING_ALG stereo_matching;
     SM_BLF_FILTER blf_filtering;
     SM_WLS_FILTER wls_filtering;
 
+    //
+
     bool disp_wls_available, disp_blf_available;
     Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
+
+    //
 
     cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
     Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
     SGM_PARAMS cuda_params, params_right;
+
+    // stereo matching parameters
 
     bool useBestDisp;
     int uniquenessRatio;
@@ -102,18 +132,34 @@ private:
     void matchLIBELAS();
     void matchSGBMCUDA();
 
+//    /**
+//    * XXXXXXXXXXXXXXX
+//    * @param Rot XXXXXXXXXXXXXXX
+//    * @param Rot XXXXXXXXXXXXXXX
+//    *
+//    */
+//    void setDisparity(cv::Mat disp, string kind);
 
     //
-    void setDisparity(cv::Mat disp, string kind);
 
     elasWrapper* elaswrap;
 
-
-
-
 public:
 
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param rf The ResourceFinder object
+    *
+    */
     void initELAS(yarp::os::ResourceFinder &rf);
+
+    /**
+    * Initializes the CUDA bilateral filter object
+    *
+    */
+    void initCUDAbilateralFilter();
+
+
 
     void setParameters(int minDisparity, int numberOfDisparities, int SADWindowSize,
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
@@ -121,22 +167,61 @@ public:
                        double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
                        SM_BLF_FILTER BLFfiltering, SM_WLS_FILTER WLSfiltering,
                        SM_MATCHING_ALG stereo_matching);
+    /**
+    * Computes the disparity map on the basis of the chosen algorith
+    *
+    */
     void compute();
-    void setAlgorithm(string n);
-    void filter();
 
+    /**
+    * Set the stereo matching method to use
+    * @param name The name of the algorithm to select
+    *
+    */
+    void setAlgorithm(string name);
+
+    /**
+    * Returns the specified disparity map, between the ones available
+    * @param kind The type of disparity map to return
+    * @return The chosen disparity map
+    *
+    */
     cv::Mat getDisparity(string kind);
+
+    /**
+    * Returns the specified disparity map, between the ones available
+    * @param kind The type of disparity map to return
+    * @return The chosen disparity map
+    *
+    */
     cv::Mat getDisparity16(string kind);
 
-
-    void initCUDAParams();
+    /**
+    * Updates the parameters of the CUDA version of the SGBM algorithm
+    *
+    */
     void updateCUDAParams();
 
+    /**
+    * Filters the chosen disparity map by means of the bilateral filter implementation which has been previously selected
+    * @param kind The type of disparity map to filter
+    *
+    */
     void filterBLF(string kind);
+
+    /**
+    * Filters the chosen disparity map by means of a Weighted Least Squares filter
+    * @param kind The type of disparity map to filter
+    *
+    */
     void filterWLS(string kind);
 
-
-
+    /**
+    * Costructor for the StereoMatcherNew object
+    * @param rf The ResourceFinder object
+    * @param stereo The pointer to the stereo camera object used in the system
+    *
+    */
     StereoMatcherNew(yarp::os::ResourceFinder &rf, StereoCamera * stereo);
     ~StereoMatcherNew();
 

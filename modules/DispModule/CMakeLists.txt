@@ -4,60 +4,58 @@
 
 project(DispModule)
 
-#add_subdirectory(imgui/examples)
-#add_subdirectory(imgui/examples/libs/gl3w/GL)
 add_subdirectory(sgbm_cuda)
 
-set(source DispModule.cpp StereoMatcher.cpp cvgui.cpp ${IMGUI_SOURCES})
-set(header DispModule.h StereoMatcher.h StereoMatcher_enums.h  cvgui.h)
+set(USE_DISPMODULE_GUI ON CACHE BOOL "Select ON to compile with the GUI code")
 
-#find_package(SDL2 REQUIRED)
-#FIND_PACKAGE(OpenGL REQUIRED)
-#find_package(GLEW 3.0 REQUIRED)
+set(source DispModule.cpp StereoMatcher.cpp)
+set(header DispModule.h StereoMatcher.h StereoMatcher_enums.h)
 
-find_package(ZED 2 REQUIRED)
-find_package(OpenCV REQUIRED)
-find_package(CUDA ${ZED_CUDA_VERSION} EXACT REQUIRED)
-
-include_directories(${CUDA_INCLUDE_DIRS})
-include_directories(${ZED_INCLUDE_DIRS})
-
-#find_package(SGBM_CUDA REQUIRED)
-
-#include_directories(${SDL2_INCLUDE_DIRS})
-#include_directories(${GLEW_INCLUDE_DIRS})
-#include_directories(${GL3W_INCLUDE_DIRS})
-#include_directories(${OPENGL_INCLUDE_DIRS})
-#include_directories("imgui/examples/libs/gl3w")
-
-include_directories(${stereoVision_INCLUDE_DIRS})
-#include_directories(imgui)
-#include_directories(imgui/examples)
-include_directories("/home/damiano/robotology/forks/stereo-vision/modules/DispModule/sgbm_cuda")
-
-
-if(USE_SIFT_GPU)
-    include_directories(${SIFTGPU_INCLUDE_DIRS})
+if(USE_DISPMODULE_GUI)
+    list(APPEND source cvgui.cpp)
+    list(APPEND header cvgui.h)
 endif()
 
-#SET(GCC_COVERAGE_LINK_FLAGS    "-lGL -ldl")
-#add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
-#SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
+find_package(OpenCV REQUIRED)
+find_package(CUDA REQUIRED)
+
+include_directories(${CUDA_INCLUDE_DIRS})
+
+include_directories(${stereoVision_INCLUDE_DIRS})
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sgbm_cuda")
+
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALLOW_IDL_GENERATION=ON")
+
+#set(${PROJECT_NAME}_THRIFT_HDR thrift/DispModule_IDL.thrift)
+#yarp_add_idl(${PROJECT_NAME}_THRIFT_SRC ${${PROJECT_NAME}_THRIFT_HDR})
 
 add_executable(${PROJECT_NAME} ${source} ${header})
 
 if(USE_SIFT_GPU)
+    include_directories(${SIFTGPU_INCLUDE_DIRS})
     target_compile_definitions(${PROJECT_NAME} PRIVATE USING_GPU)
 endif()
 
-include_directories("/home/damiano/robotology/forks/stereo-vision/modules/DispModule/sgbm_cuda")
-#find_package(SGBM_CUDA REQUIRED)
+if(USE_DISPMODULE_GUI)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GUI)
+endif()
 
-#target_link_libraries(${PROJECT_NAME} stereoVision iKin ${OpenCV_LIBRARIES} ${YARP_LIBRARIES} ${SDL2_LIBRARIES} GUI_DISP GL_MINE SGBM_CUDA ${OPENGL_LIBRARIES} ${CMAKE_DL_LIBS})
-target_link_libraries(${PROJECT_NAME} stereoVision iKin ${OpenCV_LIBRARIES} ${YARP_LIBRARIES} ${SDL2_LIBRARIES} SGBM_CUDA ${OPENGL_LIBRARIES} ${CMAKE_DL_LIBS})
+target_link_libraries(${PROJECT_NAME} stereoVision iKin ${OpenCV_LIBRARIES} ${YARP_LIBRARIES} SGBM_CUDA ${CMAKE_DL_LIBS})
 
 if(USE_SIFT_GPU)
-	target_link_libraries(${PROJECT_NAME} ${SIFTGPU_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} ${SIFTGPU_LIBRARIES})
 endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+
+#set(generated_libs_dir "${CMAKE_CURRENT_SOURCE_DIR}")
+
+#yarp_idl_to_dir(INPUT_FILES DispModule_IDL.thrift
+#                OUTPUT_DIR ${generated_libs_dir}
+#                SOURCES_VAR sources
+#                HEADERS_VAR headers
+#                INCLUDE_DIRS_VAR include_dirs)
+
+
+
+

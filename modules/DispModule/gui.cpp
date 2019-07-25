@@ -154,8 +154,8 @@ void GUI::updateGUI()
     this->updated |= ImGui::RadioButton("96", &this->numberOfDisparities, 96); ImGui::SameLine();
     this->updated |= ImGui::RadioButton("128", &this->numberOfDisparities, 128);
 
-    this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 11);
-    this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 20);
+    this->updated |= ImGui::SliderInt("SADWindowSize", &this->SADWindowSize, 3, 31);
+    this->updated |= ImGui::SliderInt("disp12MaxDiff", &this->disp12MaxDiff, 0, 30);
     this->updated |= ImGui::SliderInt("preFilterCap", &this->preFilterCap, 0, 100);
     this->updated |= ImGui::SliderInt("uniquenessRatio", &this->uniquenessRatio, 5, 20);
 
@@ -166,8 +166,8 @@ void GUI::updateGUI()
 
     // BLF filter parameters
 
-    this->updated |= ImGui::SliderFloat("sigmaColorBLF", &this->sigmaColorBLF, 1.0f, 20.0f, "%.2f");
-    this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 20.0f, "%.2f");
+    this->updated |= ImGui::SliderFloat("sigmaColorBLF", &this->sigmaColorBLF, 1.0f, 30.0f, "%.2f");
+    this->updated |= ImGui::SliderFloat("sigmaSpaceBLF", &this->sigmaSpaceBLF, 1.0f, 30.0f, "%.2f");
 
     // WLS filter parameters
 

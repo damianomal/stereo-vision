@@ -89,12 +89,12 @@ StereoCamera::StereoCamera(bool rectify) {
     cv::initModule_nonfree();
 #endif 
 
-    use_elas = false;
+//    use_elas = false;
 
-    this->debug_count = 0;
+//    this->debug_count = 0;
 
-    for(int i = 0; i < 10; i++)
-        this->debug_timings[i] = 0;
+//    for(int i = 0; i < 10; i++)
+//        this->debug_timings[i] = 0;
 }
 
 StereoCamera::StereoCamera(yarp::os::ResourceFinder &rf, bool rectify) {
@@ -114,12 +114,12 @@ StereoCamera::StereoCamera(yarp::os::ResourceFinder &rf, bool rectify) {
     cv::initModule_nonfree();
 #endif 
 
-    use_elas = false;
+//    use_elas = false;
 
-    this->debug_count = 0;
+//    this->debug_count = 0;
 
-    for(int i = 0; i < 10; i++)
-        this->debug_timings[i] = 0;
+//    for(int i = 0; i < 10; i++)
+//        this->debug_timings[i] = 0;
 }
 
 StereoCamera::StereoCamera(Camera Left, Camera Right,bool rectify) {
@@ -138,14 +138,15 @@ StereoCamera::StereoCamera(Camera Left, Camera Right,bool rectify) {
     cv::initModule_nonfree();
 #endif 
 
-    use_elas = false;
+//    use_elas = false;
 
-    this->debug_count = 0;
+//    this->debug_count = 0;
 
-    for(int i = 0; i < 10; i++)
-        this->debug_timings[i] = 0;
+//    for(int i = 0; i < 10; i++)
+//        this->debug_timings[i] = 0;
 }
 
+/*
 void StereoCamera::initELAS(yarp::os::ResourceFinder &rf)
 {
     use_elas = true;
@@ -211,6 +212,7 @@ void StereoCamera::initELAS(yarp::os::ResourceFinder &rf)
 
     cout << endl;
 }
+*/
 
 void StereoCamera::setImages(const Mat &left, const Mat &right) {
     this->imleft=left;
@@ -552,7 +554,7 @@ void StereoCamera::rectifyImages()
 
 }
 
-
+/*
 void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleWindowSize,
         int speckleRange, int numberOfDisparities, int SADWindowSize,
         int minDisparity, int preFilterCap, int disp12MaxDiff)
@@ -769,7 +771,8 @@ void StereoCamera::computeDisparity(bool best, int uniquenessRatio, int speckleW
 
     this->mutex->post();
 
-}
+}*/
+
 
 //Rect computeROI(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
 
@@ -1218,10 +1221,8 @@ Mat StereoCamera::FfromP(Mat& P1, Mat& P2)
                 Y2.at<double>(0,j)= P2.at<double>(i,j);
 
             }
-
         }
     }
-
 
 
     std::vector<Mat> MatX;
@@ -1236,7 +1237,6 @@ Mat StereoCamera::FfromP(Mat& P1, Mat& P2)
     MatY.push_back(Y3);
 
 
-
     for(int i=0; i<F_true.rows; i++)
     {
         for(int j=0; j<F_true.cols; j++)
@@ -1249,15 +1249,10 @@ Mat StereoCamera::FfromP(Mat& P1, Mat& P2)
             cv::vconcat(X,Y,concatenated);
 
             F_true.at<double>(j,i)=cv::determinant(concatenated);
-
-
         }
-
     }
 
-
     return F_true;
-
 }
 
 void StereoCamera::estimateEssential()
@@ -1428,9 +1423,6 @@ bool StereoCamera::essentialDecomposition()
     Mat tnew=Mat(3,1,CV_64FC1);
 
     chierality(R1,R2,t1,t2,Rnew,tnew,this->InliersL,this->InliersR);
-
-    //double t_norm=norm(T/norm(T),tnew/norm(tnew));
-    //double r_norm=norm(R,Rnew);
 
     Mat rvec_new=Mat::zeros(3,1,CV_64FC1);
     Mat rvec_exp=Mat::zeros(3,1,CV_64FC1);
@@ -1703,35 +1695,6 @@ Point3f StereoCamera::triangulation(Point2f& pointleft, Point2f& pointRight, Mat
 
 }
 
-
-
-/*Point3f StereoCamera::triangulationLS(Point2f& point1, Point2f& point2, Mat P, Mat P1)
-{
-
-    Point3f u(point1.x,point1.y,1.0);
-    Mat um = Kleft.inv() * Mat(u);
-    ul = um.at<Point3f>(0);
-
-    Point3f u1(point2.x,point2.y,1.0);
-    Mat um1 = Kright.inv() * Mat(u1);
-    ur = um1.at<Point3f>(0);
-
-    Mat A(u.x*P(2,0)-P(0,0),u.x*P(2,1)-P(0,1),u.x*P(2,2)-P(0,2),
-u.y*P(2,0)-P(1,0),u.y*P(2,1)-P(1,1),u.y*P(2,2)-P(1,2),
-u1.x*P1(2,0)-P1(0,0), u1.x*P1(2,1)-P1(0,1),u1.x*P1(2,2)-P1(0,2),
-u1.y*P1(2,0)-P1(1,0), u1.y*P1(2,1)-P1(1,1),u1.y*P1(2,2)-P1(1,2));
-
-   Mat A=Mat(4,3,CV_64FC1);
-
-    A.at<double>(0,0)=u.x*P.at<double>(2,0)-P.at<double(0.0);
-
-    return u;
-
-
-}*/
-
-
-
 double * StereoCamera::reprojectionError(Mat& Rot, Mat& Tras) {
     if(PointsL.empty()) {
         cout << "No keypoints found! Run findMatch first!" << endl;
@@ -1784,7 +1747,6 @@ double * StereoCamera::reprojectionError(Mat& Rot, Mat& Tras) {
     for(int i =0; i<(int) WorldPoints.size(); i++) {
         errorLeft += pow(sqrt(pow(InliersL[i].x-reprojectionL[i].x,2)+ pow(InliersL[i].y-reprojectionL[i].y,2)),2);
         //cvSet2D(err,i,0,cvScalar(errorLeft,0,0,0));
-
 
         errorRight += pow(sqrt(pow(InliersR[i].x-reprojectionR[i].x,2)+ pow(InliersR[i].y-reprojectionR[i].y,2)),2);
         //cvSet2D(err,i+WorldPoints.size(),0,cvScalar(errorRight,0,0,0));
@@ -2748,6 +2710,61 @@ void StereoCamera::setExpectedPosition(Mat &Rot, Mat &Tran)
 
 cv::Mat StereoCamera::remapDisparity(cv::Mat disp)
 {
+
+    cv::Mat dispTemp;
+
+//    if (success)
+//    {
+        if (cameraChanged)
+        {
+            this->mutex->wait();
+
+            Mat inverseMapL(disp.rows*disp.cols,1,CV_32FC2);
+            Mat inverseMapR(disp.rows*disp.cols,1,CV_32FC2);
+
+            for (int y=0; y<disp.rows; y++)
+            {
+                for (int x=0; x<disp.cols; x++)
+                {
+                    inverseMapL.ptr<float>(y*disp.cols+x)[0]=(float)x;
+                    inverseMapL.ptr<float>(y*disp.cols+x)[1]=(float)y;
+                    inverseMapR.ptr<float>(y*disp.cols+x)[0]=(float)x;
+                    inverseMapR.ptr<float>(y*disp.cols+x)[1]=(float)y;
+                }
+            }
+
+            undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
+            undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
+
+            Mat mapperL=inverseMapL.reshape(2,disp.rows);
+            Mat mapperR=inverseMapR.reshape(2,disp.rows);
+            this->MapperL=mapperL;
+            this->MapperR=mapperR;
+
+            this->mutex->post();
+
+            cameraChanged = false;
+        }
+
+        Mat x;
+        remap(disp,dispTemp,this->MapperL,x,cv::INTER_LINEAR);
+        dispTemp.convertTo(dispTemp,CV_8U);
+
+//        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
+//        std::cout << disp.size() << std::endl;
+
+
+
+        if (use_elas)
+            disp.convertTo(disp, CV_16SC1, 16.0);
+//    }
+
+//    this->mutex->wait();
+
+    return dispTemp;
+//    this->Disparity16 = disp;
+
+//    this->mutex->post();
 
 }
 
