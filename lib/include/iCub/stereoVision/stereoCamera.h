@@ -592,21 +592,11 @@ public:
     Point2f fromRectifiedToOriginal(int u, int v, int camera);
 
     /**
-    * Given the u,v pixel coordinates in the rectified image the method returns the position of the pixel in the non-rectified frame.
-    * @param u the x pixel coordinate in the rectified image.
-    * @param v the y pixel coordinate in the rectified image.
-    * @param cam cam=1 for left image, cam=2 for right image.
-    * @return the pixel position in the non-rectified image.
+    * Remaps the disparity map on the basis of the mapping previously computed
+    * @param disp the disparity map to be remapped
+    * @return the remapped disparity map
     */
     cv::Mat remapDisparity(cv::Mat disp);
-
-
-//    cv::Mat computeDisparity_filt(bool best=true, bool left_right=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0, double wls_lambda=8000., double wls_sigma=1.5);
-
-//    void computeRightDisparity(bool best=true, int uniquenessRatio=15, int speckleWindowSize=50,int speckleRange=16, int numberOfDisparities=64, int SADWindowSize=7, int minDisparity=0, int preFilterCap=63, int disp12MaxDiff=0);
-//    cv::Mat getRightDisparity();
-//    cv::Mat getRightDisparity16();
-//    void setRightDisparity(cv::Mat d);
 
 };
 

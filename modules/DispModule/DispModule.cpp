@@ -242,13 +242,13 @@ bool DispModule::configure(ResourceFinder & rf)
 
     //TODO: debug prints, remove them
 
-    this->debug_count = 0;
-    this->debug_num_timings = 11;
+//    this->debug_count = 0;
+//    this->debug_num_timings = 11;
 
-    debug_timings = new int[debug_num_timings];
+//    debug_timings = new int[debug_num_timings];
 
-    for(int i = 0; i < debug_num_timings; i++)
-        this->debug_timings[i] = 0;
+//    for(int i = 0; i < debug_num_timings; i++)
+//        this->debug_timings[i] = 0;
 
     // initialize the StereoMatcher object
 
@@ -455,6 +455,11 @@ void DispModule::recalibrate()
         bool ok=stereo->essentialDecomposition();
         mutexDisp.unlock();
 
+        // if the calibration process has been successfull,
+        // stores the parameters estimated, otherwise stops the
+        // calibration process in case it has failed for five
+        // times in a row
+
         if (ok)
         {
             calibUpdated=true;
@@ -465,7 +470,7 @@ void DispModule::recalibrate()
             T0=stereo->getTranslation();
             eyes0=eyes;
 
-            std::cout << "Calibration Successful!" << std::endl;
+            std::cout << "[DisparityModule] Calibration Successful!" << std::endl;
 
         }
         else
@@ -476,7 +481,8 @@ void DispModule::recalibrate()
                 doSFM=false;
                 calibEndEvent.signal();
 
-                std::cout << "Calibration failed after 5 trials.. Please show a non planar scene." << std::endl;
+                std::cout << "[DisparityModule] Calibration failed after 5 trials.." << std::endl <<
+                             "[DisparityModule] ..please show a non planar scene." << std::endl;
 
             }
         }
@@ -490,19 +496,19 @@ void DispModule::handleGuiUpdate()
 
     if(this->gui.toRecalibrate())
     {
-        std::cout << "Updating..." << std::endl;
+        std::cout << "[DisparityModule] Updating calibration.." << std::endl;
 
         mutexRecalibration.lock();
         numberOfTrials=0;
         doSFM=true;
         mutexRecalibration.unlock();
 
-        this->gui.setUpdated(false, false);
+        this->gui.resetState();
     }
     else
     {
         this->matcher->updateCUDAParams();
-        this->gui.setUpdated(false);
+        this->gui.resetState();
 
     }
 
@@ -517,12 +523,6 @@ bool DispModule::updateModule()
 
     ImageOf<PixelRgb> *yarp_imgL=leftImgPort.read(true);
     ImageOf<PixelRgb> *yarp_imgR=rightImgPort.read(true);
-
-//    auto start = std::chrono::high_resolution_clock::now();
-//    auto stop = std::chrono::high_resolution_clock::now();
-//    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-
-//    std::cout << std::setprecision(2) << std::fixed;
 
     Stamp stamp_left, stamp_right;
     leftImgPort.getEnvelope(stamp_left);
@@ -603,7 +603,7 @@ bool DispModule::updateModule()
 
     cv::Mat disp_vis = matcher->getDisparity("blf");
 
-    // TODO: DEBUG, removed
+    // TODO: DEBUG, to be removed
 
     std::cout << disp_vis.size() << std::endl;
     std::cout << disp_vis.empty() << std::endl;
@@ -636,13 +636,14 @@ bool DispModule::updateModule()
     // map for the current disparity map (the filtered one,
     // in case the bilateral filtering is selected)
 
-    if (outDepth.getOutputCount()>0)
+    if (outDepth.getOutputCount() > 0)
     {
         cv::Mat disp_depth = matcher->getDisparity("blf");
 
         if (disp_depth.empty())
         {
-            std::cout << "!!! Impossible to compute the depth map: disparity is not available" << std::endl;
+            std::cout << "[DisparityModule] Impossible to compute the depth map.." << std::endl <<
+                         "[DisparityModule] the disparity map is not available!" << std::endl;
         }
         else
         {

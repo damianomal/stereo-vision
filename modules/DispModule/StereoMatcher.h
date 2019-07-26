@@ -14,6 +14,8 @@
 
 //#include "StereoMatcher_enums.h"
 
+//
+
 enum SM_MATCHING_ALG {
     SGBM_OPENCV = 0,
     SGBM_CUDA,
@@ -32,25 +34,7 @@ enum SM_WLS_FILTER {
     WLS_LRCHECK
 };
 
-
-
-//enum SM_MATCHING_ALG {
-//    SGBM_OPENCV = 0,
-//    SGBM_CUDA,
-//    LIBELAS
-//};
-
-//enum SM_BLF_FILTER {
-//    BLF_ORIGINAL = 0,
-//    BLF_CUDA,
-//    BLF_DISABLED
-//};
-
-//enum SM_WLS_FILTER {
-//    WLS_DISABLED = 0,
-//    WLS_ENABLED,
-//    WLS_LRCHECK
-//};
+//
 
 typedef struct {
 
@@ -147,7 +131,7 @@ private:
 public:
 
     /**
-    * XXXXXXXXXXXXXXX
+    * Initialize the LibElas stereo matching wrapper object
     * @param rf The ResourceFinder object
     *
     */

@@ -29,22 +29,6 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
 
     std::cout << "GUI - initializeGUI\n";
 
-//    this->params.minDisparity = &minDisparity;
-//    this->params.numberOfDisparities = &numberOfDisparities;
-//    this->params.SADWindowSize = &SADWindowSize;
-//    this->params.disp12MaxDiff = &disp12MaxDiff;
-//    this->params.preFilterCap = &preFilterCap;
-//    this->params.uniquenessRatio = &uniquenessRatio;
-//    this->params.speckleWindowSize = &speckleWindowSize;
-//    this->params.speckleRange = &speckleRange;
-//    this->params.sigmaColorBLF = &sigmaColorBLF;
-//    this->params.sigmaSpaceBLF = &sigmaSpaceBLF;
-//    this->params.wls_lambda = &wls_lambda;
-//    this->params.wls_sigma = &wls_sigma;
-//    this->params.BLFfiltering = BLFfiltering;
-//    this->params.WLSfiltering = WLSfiltering;
-//    this->params.stereo_matching = stereo_matching;
-
     this->params.minDisparity = minDisparity;
     this->params.numberOfDisparities = numberOfDisparities;
     this->params.SADWindowSize = SADWindowSize;
@@ -72,15 +56,13 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
 void GUI::initializeGUI()
 {
 
-    this->done = false;
-    this->updated = false;
-    this->recalibrate = false;
-    this->save_calibration = false;
-    this->set_default = false;
-    this->save_parameters = false;
+    // initializes the GUI internal states
+
+    this->resetState();
+
+    // creates the window on which to plot the GUI
 
     frame = cv::Mat(cv::Size(450, cvuimine::estimateHeight(10,4,2)), CV_8UC3);
-
     cvui::init(WINDOW_NAME, 3);
 
     // TODO conversione da ENUMs a parametri id interni
@@ -333,17 +315,29 @@ bool GUI::toSaveCalibration()
 }
 
 
-/******************************************************************************/
-void GUI::setUpdated(bool v)
-{
-    this->updated = v;
-    this->save_calibration = false;
-}
+///******************************************************************************/
+//void GUI::setUpdated(bool v)
+//{
+//    this->updated = v;
+//    this->save_calibration = false;
+//}
+
+///******************************************************************************/
+//void GUI::setUpdated(bool v1, bool v2)
+//{
+//    this->updated = v1;
+//    this->recalibrate = v2;
+//    this->save_calibration = false;
+//}
 
 /******************************************************************************/
-void GUI::setUpdated(bool v1, bool v2)
+void GUI::resetState()
 {
-    this->updated = v1;
-    this->recalibrate = v2;
+    this->done = false;
+    this->updated = false;
+    this->recalibrate = false;
     this->save_calibration = false;
+    this->set_default = false;
+    this->save_parameters = false;
+
 }

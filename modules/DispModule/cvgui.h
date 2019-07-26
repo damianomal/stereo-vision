@@ -1,7 +1,6 @@
 #ifndef _GUI_H_
 #define _GUI_H_
 
-//#include "StereoMatcher_enums.h"
 #include "StereoMatcher.h"
 #include <iostream>
 #include <string>
@@ -10,28 +9,6 @@
 #include <opencv2/highgui/highgui.hpp>
 
 // the struct containing the parameters handled by the GUI
-
-//typedef struct {
-
-//    int * uniquenessRatio;
-//    int * speckleWindowSize;
-//    int * speckleRange;
-//    int * numberOfDisparities;
-//    int * SADWindowSize;
-//    int * minDisparity;
-//    int * preFilterCap;
-//    int * disp12MaxDiff;
-
-//    double * sigmaColorBLF;
-//    double * sigmaSpaceBLF;
-//    double * wls_lambda;
-//    double * wls_sigma;
-
-//    SM_BLF_FILTER BLFfiltering;
-//    SM_WLS_FILTER WLSfiltering;
-//    SM_MATCHING_ALG stereo_matching;
-
-//} Params;
 
 typedef struct {
 
@@ -62,32 +39,31 @@ class GUI
 
 private:
 
-    //
+    // flag set to True if the interface has been quitted
     bool done;
 
-    //
+    // flag set to True if the interface has been used/updated in the last timeframe
     bool updated;
 
-    //
+    // flag set to True if the user asked the system to recalibrate the stereo system
     bool recalibrate;
 
-    //
+    // flag set to True if the user clicked the button to save the current calibration parameters
     bool save_calibration;
 
-    //
+    // flag set to True if the user chose to revert the matching/filtering parameters to their default values
     bool set_default;
 
-    //
+    // flag set to True if the user selected
     bool save_parameters;
 
+    // the parameters handled by the GUI
     Params params;
 
+    // the OpenCV Mat object where to draw the interface
     cv::Mat frame;
 
-//    bool useWLS;
-//    bool useBLF;
-//    bool left_right;
-
+    // stereo matching parameters and auxiliary variables
     SM_BLF_FILTER BLFfiltering;
     SM_WLS_FILTER WLSfiltering;
     SM_MATCHING_ALG stereo_matching;
@@ -99,7 +75,7 @@ private:
 public:
 
     /**
-    * XXXXXXXXXXXXXXX
+    * Kills the GUI and deletes the no more needed objects
     *
     */
     void killGUI();
@@ -127,7 +103,7 @@ public:
                        SM_MATCHING_ALG &stereo_matching);
 
     /**
-    * This is the GUI main update loop
+    * Runs the GUI main update loop
     *
     */
     void updateGUI();
@@ -163,14 +139,20 @@ public:
     bool isUpdated();
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param v XXXXXXXXXXXXXXX
+    * Sets the state of the interface to the one specified
+    * @param v the new update state of the interface
     *
     */
     void setUpdated(bool v);
 
     /**
-    * XXXXXXXXXXXXXXX
+     * Resets the GUI internal update flags
+     *
+     */
+    void resetState();
+
+    /**
+    * Sets the state of the interface to the one specified
     * @param v1 XXXXXXXXXXXXXXX
     * @param v2 XXXXXXXXXXXXXXX
     *

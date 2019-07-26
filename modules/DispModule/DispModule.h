@@ -319,16 +319,14 @@ class DispModule: public yarp::os::RFModule
     bool useWLSfiltering;
     bool usePorts;
     bool left_right;
+
+    // mutex and other handles needed by the module
+
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
 
-    // --- TEMP: used for debugging
-    int * debug_timings;
-    int debug_count;
-    int debug_num_timings;
-
-    //
+    // objects to interfare with the
 
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
@@ -340,22 +338,22 @@ class DispModule: public yarp::os::RFModule
     Mat R0,T0;
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param rf XXXXXXXXXXXXXXX
-    * @param KL XXXXXXXXXXXXXXX
-    * @param KR XXXXXXXXXXXXXXX
-    * @param DistL XXXXXXXXXXXXXXX
-    * @param DistR XXXXXXXXXXXXXXX
-    * @return XXXXXXXXXXXXXXX
+    * Loads the cameras intrinsic matrices
+    * @param rf the ResourceFinder object
+    * @param KL left camera intrinsic parameters matrix
+    * @param KR right camera intrinsic parameters matrix
+    * @param DistL left camera distortion parameters
+    * @param DistR right camera distortion parameters
+    * @return True if the loading is successfull, False otherwise
     *
     */
     bool loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL, Mat &DistR);
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param R XXXXXXXXXXXXXXX
-    * @param T XXXXXXXXXXXXXXX
-    * @return XXXXXXXXXXXXXXX
+    * Builds a 4x4 rototraslation matrix starting from the corresponding rotation matrix and translation vector
+    * @param R the 3x3 rotation matrix
+    * @param T the 3x1 translation vector
+    * @return the 4x4 rototraslation matrix resulting from the merging of the two input ones
     *
     */
     Mat buildRotTras(const Mat& R, const Mat& T);
@@ -370,16 +368,16 @@ class DispModule: public yarp::os::RFModule
 
     /**
     * Converts a matrix from YARP format to OpenCV format
-    * @param matrix Input YARP matrix
-    * @param mat Output cv::Mat object
+    * @param matrix input YARP matrix
+    * @param mat output cv::Mat object
     *
     */
     void convert(Matrix& matrix, Mat& mat);
 
     /**
     * Converts a matrix from OpenCV formato to YARP format
-    * @param mat Input cv::Mat object
-    * @param matrix Output YARP matrix
+    * @param mat input cv::Mat object
+    * @param matrix output YARP matrix
     *
     */
     void convert(Mat& mat, Matrix& matrix);
@@ -388,10 +386,10 @@ class DispModule: public yarp::os::RFModule
 
     /**
     * Loads the extrinsics parameters of the camera system, via the ResourceFinder
-    * @param rf The ResourceFinder object
-    * @param Ro The rotation of the right eye with respect to the left one
-    * @param To The translation of the right eye with respect to the left one
-    * @param eyes xXXXXXXXXXXXx
+    * @param rf the ResourceFinder object
+    * @param Ro the rotation of the right eye with respect to the left one
+    * @param To the translation of the right eye with respect to the left one
+    * @param eyes the state of the eyes
     * @return
     *
     */
@@ -399,25 +397,25 @@ class DispModule: public yarp::os::RFModule
 
     /**
     * Updates the extrinsics parameters within the local configuration file
-    * @param Rot XXXXXXXXXXXXXXX
-    * @param Tr XXXXXXXXXXXXXXX
-    * @param eyes XXXXXXXXXXXXXXX
-    * @param groupname XXXXXXXXXXXXXXX
+    * @param Rot estimated rotation  of the right camera with respect to the Left one
+    * @param Tr estimated translation of the right camera with respect to the Left one
+    * @param eyes the eyes state when the last calibration has been executed
+    * @param groupname Nname of the properties associated with the stereo system to be written within the configuration file
     * @return
     *
     */
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
 
     /**
-    * XXXXXXXXXXXXXXX
+    * Updates the stereo system translation and rotation parameters by getting the pose of the eyes with respect to the ROOT reference frame
     * @param update XXXXXXXXXXXXXXX
     *
     */
     void updateViaGazeCtrl(const bool update);
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param deyes XXXXXXXXXXXXXXX
+    * Updates the stereo system translation and rotation parameters by acquiring the state of the eyes (version and vergence)
+    * @param deyes the delta of the eyes state with respect to the one associated with the last calibration which has been carried out
     *
     */
     void updateViaKinematics(const yarp::sig::Vector& deyes);
@@ -430,23 +428,13 @@ class DispModule: public yarp::os::RFModule
 
     /**
     * Computes the depth map starting from the disparity map
-    * @param disp The disparity map
-    * @param Q The transformation matrix resulting from the rectification process
-    * @param R The rectification trasform for the left camera
-    * @return A matrix containing the depth values associated with every point in the disparity map
+    * @param disp the disparity map
+    * @param Q the transformation matrix resulting from the rectification process
+    * @param R the rectification trasform for the left camera
+    * @return a matrix containing the depth values associated with every point in the disparity map
     *
     */
     Mat depthFromDisparity(Mat disp, Mat Q, Mat R);
-
-//    /**
-//    * Computes the depth map starting from the disparity map
-//    * @param disp The disparity map
-//    * @param Q The transformation matrix resulting from the rectification process
-//    * @param R The rectification trasform for the left camera
-//    * @return A matrix containing the depth values associated with every point in the disparity map
-//    *
-//    */
-//    Mat depthFromDisparity_alt(Mat disp, Mat Q, Mat R);
 
     /**
     * Checks the status of the GUI, and if there are additional operations to carry out
@@ -476,9 +464,7 @@ class DispModule: public yarp::os::RFModule
 
 public:
 
-//    cv::Mat dispT;
-
-    //
+    // module methods
 
     bool configure(ResourceFinder &rf);
     bool close();
@@ -528,10 +514,10 @@ public:
     /**
     * Projects a 3D point onto one of the two image planes
     * @param camera Camera plane to project the point to, can be "left" or "right"
-    * @param x First coordinate of the 3D point
-    * @param y Second coordinate of the 3D point
-    * @param z Third coordinate of the 3D point
-    * @return The 2D Coordinates of the projected point, on the selected image plane
+    * @param x first coordinate of the 3D point
+    * @param y second coordinate of the 3D point
+    * @param z third coordinate of the 3D point
+    * @return the 2D Coordinates of the projected point, on the selected image plane
     *
     */
     Point2f projectPoint(const string &camera, double x, double y, double z);
