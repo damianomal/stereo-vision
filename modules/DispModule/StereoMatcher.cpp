@@ -40,23 +40,23 @@ void StereoMatcherNew::setParameters(int minDisparity, int numberOfDisparities, 
                                   SM_BLF_FILTER BLFfiltering, SM_WLS_FILTER WLSfiltering,
                                   SM_MATCHING_ALG stereo_matching)
 {
-    this->minDisparity = minDisparity;
-    this->numberOfDisparities = numberOfDisparities;
-    this->SADWindowSize = SADWindowSize;
-    this->disp12MaxDiff = disp12MaxDiff;
-    this->preFilterCap = preFilterCap;
-    this->uniquenessRatio = uniquenessRatio;
-    this->speckleWindowSize = speckleWindowSize;
-    this->speckleRange = speckleRange;
-    this->sigmaColorBLF = sigmaColorBLF;
-    this->sigmaSpaceBLF = sigmaSpaceBLF;
-    this->wls_lambda = wls_lambda;
-    this->wls_sigma = wls_sigma;
-    this->blf_filtering = BLFfiltering;
-    this->wls_filtering = WLSfiltering;
-    this->stereo_matching = stereo_matching;
+    this->stereo_parameters.minDisparity = minDisparity;
+    this->stereo_parameters.numberOfDisparities = numberOfDisparities;
+    this->stereo_parameters.SADWindowSize = SADWindowSize;
+    this->stereo_parameters.disp12MaxDiff = disp12MaxDiff;
+    this->stereo_parameters.preFilterCap = preFilterCap;
+    this->stereo_parameters.uniquenessRatio = uniquenessRatio;
+    this->stereo_parameters.speckleWindowSize = speckleWindowSize;
+    this->stereo_parameters.speckleRange = speckleRange;
+    this->stereo_parameters.sigmaColorBLF = sigmaColorBLF;
+    this->stereo_parameters.sigmaSpaceBLF = sigmaSpaceBLF;
+    this->stereo_parameters.wls_lambda = wls_lambda;
+    this->stereo_parameters.wls_sigma = wls_sigma;
+    this->stereo_parameters.BLFfiltering = BLFfiltering;
+    this->stereo_parameters.WLSfiltering = WLSfiltering;
+    this->stereo_parameters.stereo_matching = stereo_matching;
 
-    std::cout << "AAAA " << this->numberOfDisparities << std::endl;
+//    std::cout << "AAAA " << this->speckleRange << std::endl;
 }
 
 
@@ -65,14 +65,14 @@ void StereoMatcherNew::setParameters(int minDisparity, int numberOfDisparities, 
 void StereoMatcherNew::compute()
 {
 
-    std::cout << "SM: rectify\n";
+//    std::cout << "SM: rectify\n";
 
     this->stereo->rectifyImages();
 
-    std::cout << "SM: match\n";
+//    std::cout << "SM: match\n";
 
 
-    switch(this->stereo_matching)
+    switch(this->stereo_parameters.stereo_matching)
     {
         case SM_MATCHING_ALG::SGBM_OPENCV:
             this->matchSGBM();
@@ -92,17 +92,17 @@ void StereoMatcherNew::filterBLF(string kind = "base")
 
     // TODO finire di scrivere]
 
-    std::cout << "SM: getDisparity\n";
+//    std::cout << "SM: getDisparity\n";
 
     cv::Mat input = this->getDisparity(kind);
 
-    std::cout << "SM: switch\n";
+//    std::cout << "SM: switch\n";
 
-    switch(this->blf_filtering)
+    switch(this->stereo_parameters.BLFfiltering)
     {
         case SM_BLF_FILTER::BLF_ORIGINAL:
 
-            cv_extend::bilateralFilter(input, this->disparity_blf, this->sigmaColorBLF, this->sigmaSpaceBLF);
+            cv_extend::bilateralFilter(input, this->disparity_blf, this->stereo_parameters.sigmaColorBLF, this->stereo_parameters.sigmaSpaceBLF);
             break;
 
         case SM_BLF_FILTER::BLF_CUDA:
@@ -135,27 +135,32 @@ void StereoMatcherNew::filterWLS(string kind = "base")
 
     cv::Mat input = this->getDisparity(kind);
 
-    if(this->wls_filtering != SM_WLS_FILTER::WLS_DISABLED)
+    if(this->stereo_parameters.WLSfiltering != SM_WLS_FILTER::WLS_DISABLED)
     {
 
-        Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-                                                    8*3*this->SADWindowSize*this->SADWindowSize,
-                                                    32*3*this->SADWindowSize*this->SADWindowSize,
-                                                    this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-                                                    this->speckleWindowSize, this->speckleRange,
-                                                    this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+        Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->stereo_parameters.minDisparity,
+                                                     this->stereo_parameters.numberOfDisparities,
+                                                     this->stereo_parameters.SADWindowSize,
+                                                     8*3*this->stereo_parameters.SADWindowSize*this->stereo_parameters.SADWindowSize,
+                                                     32*3*this->stereo_parameters.SADWindowSize*this->stereo_parameters.SADWindowSize,
+                                                     this->stereo_parameters.disp12MaxDiff,
+                                                     this->stereo_parameters.preFilterCap,
+                                                     this->stereo_parameters.uniquenessRatio,
+                                                     this->stereo_parameters.speckleWindowSize,
+                                                     this->stereo_parameters.speckleRange,
+                                                     this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
         cv::Mat left_rect = this->stereo->getLRectified();
 
-        switch(this->wls_filtering)
+        switch(this->stereo_parameters.WLSfiltering)
         {
             case SM_WLS_FILTER::WLS_ENABLED:
             {
                 wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
 
-                wls_filter->setLambda(this->wls_lambda);
-                wls_filter->setSigmaColor(this->wls_sigma);
-                wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->SADWindowSize));
+                wls_filter->setLambda(this->stereo_parameters.wls_lambda);
+                wls_filter->setSigmaColor(this->stereo_parameters.wls_sigma);
+                wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->stereo_parameters.SADWindowSize));
                 cv::Rect ROI = computeROI2(left_rect.size(),sgbm);
 
                 wls_filter->filter(input,left_rect,this->disparity_wls,Mat(),ROI);
@@ -163,10 +168,35 @@ void StereoMatcherNew::filterWLS(string kind = "base")
 
                 break;
             }
-            case SM_WLS_FILTER::WLS_LRCHECK:
+            case SM_WLS_FILTER::WLS_LRCHECK:                    
 
-//                if(this->stereo_matching == SM_MATCHING_ALG::SGBM_OPENCV)
-//                {
+                if(this->stereo_matching == SM_MATCHING_ALG::SGBM_OPENCV)
+                {
+
+                    wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
+
+                    wls_filter->setLambda(this->stereo_parameters.wls_lambda);
+                    wls_filter->setSigmaColor(this->stereo_parameters.wls_sigma);
+                    wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->stereo_parameters.SADWindowSize));
+                    cv::Rect ROI = computeROI2(left_rect.size(),sgbm);
+
+                    wls_filter->filter(input,left_rect,this->disparity_wls,Mat(),ROI);
+    //                wls_filter->filter(outputDm,left_rect,disp_wls_2,Mat(),ROI);
+
+                    cv::Mat right_disp;
+
+                    Ptr<StereoMatcher> right_matcher = cv::ximgproc::createRightMatcher(sgbm);
+
+//                    matching_time = (double)getTickCount();
+//                    left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
+                    right_matcher->compute(this->stereo->getRRectified(),this->stereo->getLRectified(), right_disp);
+//                    matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+
+                    wls_filter->filter(input,left_rect,this->disparity_wls,right_disp);
+
+
+
+
 //                    wls_filter = createDisparityWLSFilter(sgbm);
 
 //                    wls_filter->setLambda(wls_lambda);
@@ -178,9 +208,11 @@ void StereoMatcherNew::filterWLS(string kind = "base")
 ////                    std::cout << this->stereo->getRightDisparity().cols << std::endl;
 
 //                    wls_filter->filter(input,left_rect,this->disparity_wls,this->stereo->getRightDisparity());
-//                }
-//                else
-//                    this->disparity_wls = input;
+                }
+                else
+                    this->disparity_wls = input.clone();
+
+//                this->disparity_wls = input.clone();
 
                 break;
 
@@ -190,7 +222,7 @@ void StereoMatcherNew::filterWLS(string kind = "base")
         }
     }
     else
-        this->disparity_wls = input;
+        this->disparity_wls = input.clone();
 
 //    std::cout << "FilterWLS - End\n";
 
@@ -298,15 +330,15 @@ void StereoMatcherNew::setAlgorithm(string name)
 //        c = toupper(c);
 
     if(name == "sgbm")
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     else if(name == "sgbm_cuda")
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
     else if(name == "libelas")
-        this->stereo_matching = SM_MATCHING_ALG::LIBELAS;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::LIBELAS;
     else
     {
         std::cout << "!! Stereo Matching algorithm " << name <<  " not found, defaulting to SGBM." << std::endl;
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     }
 
 }
@@ -380,34 +412,21 @@ StereoMatcherNew::StereoMatcherNew(yarp::os::ResourceFinder &rf, StereoCamera * 
 
 }
 
-//void StereoMatcherNew::initCUDAParams()
-//{
-
-//    this->cuda_params.preFilterCap = this->preFilterCap;
-//    this->cuda_params.BlockSize = this->SADWindowSize;
-//    this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-//    this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-//    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-//    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
-
-//    cuda_init(&this->cuda_params);
-
-//}
-
 /******************************************************************************/
 void StereoMatcherNew::updateCUDAParams()
 {
-    this->cuda_params.preFilterCap = this->preFilterCap;
-    this->cuda_params.BlockSize = this->SADWindowSize;
+    this->cuda_params.preFilterCap = this->stereo_parameters.preFilterCap;
+    this->cuda_params.BlockSize = this->stereo_parameters.SADWindowSize;
     this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
     this->cuda_params.P2 = 32 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
-    this->cuda_params.uniquenessRatio = this->uniquenessRatio;
-    this->cuda_params.disp12MaxDiff = this->disp12MaxDiff;
+    this->cuda_params.uniquenessRatio = this->stereo_parameters.uniquenessRatio;
+    this->cuda_params.disp12MaxDiff = this->stereo_parameters.disp12MaxDiff;
+    this->cuda_params.numberOfDisparities = this->stereo_parameters.numberOfDisparities;
 
     cuda_init(&this->cuda_params);
 
-    pCudaBilFilter->setSigmaRange(sigmaColorBLF);
-    pCudaBilFilter->setNumDisparities(this->numberOfDisparities);
+    pCudaBilFilter->setSigmaRange(this->stereo_parameters.sigmaColorBLF);
+    pCudaBilFilter->setNumDisparities(this->stereo_parameters.numberOfDisparities);
 
 }
 
@@ -417,8 +436,8 @@ void StereoMatcherNew::initCUDAbilateralFilter()
     int radius = 7;
     int iters = 2;
 
-    this->pCudaBilFilter = cuda::createDisparityBilateralFilter(this->numberOfDisparities, radius, iters);
-    this->pCudaBilFilter->setSigmaRange(sigmaColorBLF);
+    this->pCudaBilFilter = cuda::createDisparityBilateralFilter(this->stereo_parameters.numberOfDisparities, radius, iters);
+    this->pCudaBilFilter->setSigmaRange(this->stereo_parameters.sigmaColorBLF);
 
 }
 
@@ -432,18 +451,15 @@ void StereoMatcherNew::initELAS(yarp::os::ResourceFinder &rf)
 
     this->elaswrap = new elasWrapper(disp_scaling_factor, elas_string);
 
-
     if (rf.check("elas_subsampling"))
         elaswrap->set_subsampling(true);
 
     if (rf.check("elas_add_corners"))
         elaswrap->set_add_corners(true);
 
-
     elaswrap->set_ipol_gap_width(40);
     if (rf.check("elas_ipol_gap_width"))
         elaswrap->set_ipol_gap_width(rf.find("elas_ipol_gap_width").asInt());
-
 
     if (rf.check("elas_support_threshold"))
         elaswrap->set_support_threshold(rf.find("elas_support_threshold").asDouble());
@@ -493,20 +509,15 @@ void StereoMatcherNew::initELAS(yarp::os::ResourceFinder &rf)
 void StereoMatcherNew::matchLIBELAS()
 {
 
-    cv::Mat outputDm;
+    cv::Mat map;
 
-    bool success = elaswrap->compute_disparity(this->stereo->getLRectified(), this->stereo->getRRectified(), this->disparity, this->numberOfDisparities);
+    bool success = elaswrap->compute_disparity(this->stereo->getLRectified(), this->stereo->getRRectified(), this->disparity, this->stereo_parameters.numberOfDisparities);
 
     if (success)
-        outputDm = this->disparity * (255.0 / this->numberOfDisparities);
+        map = this->disparity * (255.0 / this->stereo_parameters.numberOfDisparities);
 
-    outputDm.convertTo(outputDm, CV_16SC1, 16.0);
-
-//    this->disp_libelas.disp16 = outputDm;
-//    this->disp_sgbm.disp = this->stereo->remapDisparity(map);
-
-    this->disparity16 = outputDm;
-    this->disparity = this->stereo->remapDisparity(outputDm);
+    this->disparity = this->stereo->remapDisparity(map);
+    this->disparity.convertTo(this->disparity16, CV_16SC1, 16.0);
 
 }
 
@@ -516,25 +527,28 @@ void StereoMatcherNew::matchSGBM()
 
     cv::Mat map, disp;
 
-    Ptr<StereoSGBM> sgbm=cv::StereoSGBM::create(this->minDisparity,this->numberOfDisparities,this->SADWindowSize,
-                                                8*3*this->SADWindowSize*this->SADWindowSize,
-                                                32*3*this->SADWindowSize*this->SADWindowSize,
-                                                this->disp12MaxDiff,this->preFilterCap,this->uniquenessRatio,
-                                                this->speckleWindowSize, this->speckleRange,
-                                                this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
+    Ptr<StereoSGBM> sgbm =cv::StereoSGBM::create(this->stereo_parameters.minDisparity,
+                                                 this->stereo_parameters.numberOfDisparities,
+                                                 this->stereo_parameters.SADWindowSize,
+                                                 8*3*this->stereo_parameters.SADWindowSize*this->stereo_parameters.SADWindowSize,
+                                                 32*3*this->stereo_parameters.SADWindowSize*this->stereo_parameters.SADWindowSize,
+                                                 this->stereo_parameters.disp12MaxDiff,
+                                                 this->stereo_parameters.preFilterCap,
+                                                 this->stereo_parameters.uniquenessRatio,
+                                                 this->stereo_parameters.speckleWindowSize,
+                                                 this->stereo_parameters.speckleRange,
+                                                 this->useBestDisp?StereoSGBM::MODE_HH:StereoSGBM::MODE_SGBM);
 
 
     sgbm->compute(this->stereo->getLRectified(), this->stereo->getRRectified(), disp);
 
-
-//    this->disp_sgbm.disp16 = disp;
     this->disparity16 = disp;
-    disp.convertTo(map,CV_32FC1,255/(this->numberOfDisparities*16.));
 
+    disp.convertTo(map, CV_32FC1, 1.0,0.0);
+    map.convertTo(map,CV_32FC1,255/(this->stereo_parameters.numberOfDisparities*16.));
 
-//    this->disp_sgbm.disp = this->stereo->remapDisparity(map);
 //    this->disparity = this->stereo->remapDisparity(map);
-    this->disparity = map;
+    map.convertTo(this->disparity,CV_8U);
 
 }
 
@@ -554,8 +568,6 @@ void StereoMatcherNew::matchSGBMCUDA()
 
     outputDm = zy_remap(grayL, grayR);
 
-//    this->disp_cuda.disp = outputDm;
-//    this->disp_cuda.disp16 = outputDm;
     this->disparity = outputDm;
     this->disparity16 = outputDm;
 }

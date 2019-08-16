@@ -12,8 +12,6 @@
 
 #include "opencv2/ximgproc/disparity_filter.hpp"
 
-//#include "StereoMatcher_enums.h"
-
 //
 
 enum SM_MATCHING_ALG {
@@ -33,6 +31,30 @@ enum SM_WLS_FILTER {
     WLS_ENABLED,
     WLS_LRCHECK
 };
+
+//
+
+typedef struct {
+
+    int uniquenessRatio;
+    int speckleWindowSize;
+    int speckleRange;
+    int numberOfDisparities;
+    int SADWindowSize;
+    int minDisparity;
+    int preFilterCap;
+    int disp12MaxDiff;
+
+    double sigmaColorBLF;
+    double sigmaSpaceBLF;
+    double wls_lambda;
+    double wls_sigma;
+
+    SM_BLF_FILTER BLFfiltering;
+    SM_WLS_FILTER WLSfiltering;
+    SM_MATCHING_ALG stereo_matching;
+
+} Params;
 
 //
 
@@ -92,39 +114,29 @@ private:
     // stereo matching parameters
 
     bool useBestDisp;
-    int uniquenessRatio;
-    int speckleWindowSize;
-    int speckleRange;
-    int numberOfDisparities;
-    int SADWindowSize;
-    int minDisparity;
-    int preFilterCap;
-    int disp12MaxDiff;
-    bool doSFM;
-    bool calibUpdated;
-    bool debugWindow;
-    double sigmaColorBLF;
-    double sigmaSpaceBLF;
-    double wls_lambda;
-    double wls_sigma;
 
+//    int uniquenessRatio;
+//    int speckleWindowSize;
+//    int speckleRange;
+//    int numberOfDisparities;
+//    int SADWindowSize;
+//    int minDisparity;
+//    int preFilterCap;
+//    int disp12MaxDiff;
+//    double sigmaColorBLF;
+//    double sigmaSpaceBLF;
+//    double wls_lambda;
+//    double wls_sigma;
 
-//    Disparities disp_sgbm, disp_cuda, disp_libelas, disparities;
+    Params stereo_parameters;
 
     // different matching algorithms
+
     void matchSGBM();
     void matchLIBELAS();
     void matchSGBMCUDA();
 
-//    /**
-//    * XXXXXXXXXXXXXXX
-//    * @param Rot XXXXXXXXXXXXXXX
-//    * @param Rot XXXXXXXXXXXXXXX
-//    *
-//    */
-//    void setDisparity(cv::Mat disp, string kind);
-
-    //
+    // object wrapping the LibElas calls
 
     elasWrapper* elaswrap;
 
@@ -151,6 +163,7 @@ public:
                        double sigmaSpaceBLF, double wls_lambda, double wls_sigma,
                        SM_BLF_FILTER BLFfiltering, SM_WLS_FILTER WLSfiltering,
                        SM_MATCHING_ALG stereo_matching);
+
     /**
     * Computes the disparity map on the basis of the chosen algorith
     *

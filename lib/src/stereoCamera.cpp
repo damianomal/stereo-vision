@@ -327,11 +327,11 @@ void StereoCamera::runStereoCalib(const vector<string>& imagelist, Size boardSiz
             j++;
         }
     }
-    fprintf(stdout,"%i pairs have been successfully detected.\n",j);
+    std::cout << "[StereoCamera] " << j << " pairs have been successfully detected." << std::endl;
     nimages = j;
     if( nimages < 2 )
     {
-        fprintf(stdout,"Error: too few pairs detected");
+        std::cout << "[StereoCamera] Error: too few pairs detected." << std::endl;
         return;
     }
 
@@ -346,7 +346,7 @@ void StereoCamera::runStereoCalib(const vector<string>& imagelist, Size boardSiz
                 objectPoints[i].push_back(Point3f(j*squareSize, k*squareSize, 0));
     }
 
-    fprintf(stdout,"Running stereo calibration ...\n");
+    std::cout << "[StereoCamera] Running stereo calibration.." << std::endl;
 
     Mat cameraMatrix[2], distCoeffs[2];
     Mat E, F;
@@ -366,7 +366,7 @@ void StereoCamera::runStereoCalib(const vector<string>& imagelist, Size boardSiz
                 CV_CALIB_FIX_ASPECT_RATIO+CV_CALIB_ZERO_TANGENT_DIST+CV_CALIB_SAME_FOCAL_LENGTH+
                 CV_CALIB_RATIONAL_MODEL+CV_CALIB_FIX_K3+CV_CALIB_FIX_K4+CV_CALIB_FIX_K5);
             #endif
-        fprintf(stdout,"done with RMS error= %f\n",rms);
+        std::cout << "[StereoCamera] Calibration done with RMS error = " << rms << std::endl;
     } else
     {
         double rms = stereoCalibrate(objectPoints, imagePoints[0], imagePoints[1],
@@ -380,7 +380,8 @@ void StereoCamera::runStereoCalib(const vector<string>& imagelist, Size boardSiz
                 TermCriteria(TermCriteria::MAX_ITER+TermCriteria::EPS, 100, 1e-5),
                 CV_CALIB_FIX_INTRINSIC);
             #endif
-        fprintf(stdout,"done with RMS error= %f\n",rms);
+        std::cout << "[StereoCamera] Calibration done with RMS error = " << rms << std::endl;
+
     }
     // CALIBRATION QUALITY CHECK
     // because the output fundamental matrix implicitly
@@ -418,16 +419,16 @@ void StereoCamera::runStereoCalib(const vector<string>& imagelist, Size boardSiz
         npoints += npt;
     }
     Mat R1,R2,P1,P2;
-    Rect roi1, roi2;
+//    Rect roi1, roi2;
     stereoRectify( this->Kleft, this->DistL, this->Kright, this->DistR, imageSize, this->R, this->T, R1, R2, P1, P2, this->Q, -1);
-    fprintf(stdout,"average reprojection err = %f\n",err/npoints);
+    std::cout << "[StereoCamera] Average reprojection error = " << err/npoints << std::endl;
 
 }
 
 void StereoCamera::saveCalibration(string extrinsicFilePath, string intrinsicFilePath) {
 
     if( Kleft.empty() || Kright.empty() || DistL.empty() || DistR.empty() || R.empty() || T.empty()) {
-        cout << "Error: cameras are not calibrated! Run the calibration or set intrinsic and extrinsic parameters \n";
+        std::cout << "Error: cameras are not calibrated! Run the calibration or set intrinsic and extrinsic parameters" << std::endl;
         return;
     }
 
@@ -447,7 +448,7 @@ void StereoCamera::saveCalibration(string extrinsicFilePath, string intrinsicFil
         fs.release();
     }
     else
-        cout << "Error: can not save the intrinsic parameters\n";
+        std::cout << "Error: can not save the intrinsic parameters" << std::endl;
 
     ofstream fout((intrinsicFilePath+".ini").c_str());
 
@@ -1249,7 +1250,8 @@ void StereoCamera::estimateEssential()
     vector<Point2f> filteredL;
     vector<Point2f> filteredR;
 
-    fprintf(stdout,"%lu Match Found \n",PointsR.size());
+    std::cout << "[StereoCamera] " << PointsR.size() << " Matches Found." << std::endl;
+
     Mat pl=Mat(3,1,CV_64FC1);
     Mat pr=Mat(3,1,CV_64FC1);
 
@@ -1285,7 +1287,7 @@ void StereoCamera::estimateEssential()
         }
     }
 
-    fprintf(stdout,"%lu Match After Kinematics Filtering \n",filteredL.size());
+    std::cout << "[StereoCamera] " << filteredL.size() << " Matches Left After Kinematics Filtering." << std::endl;
 
     vector<uchar> status;
     this->F=findFundamentalMat(Mat(filteredL), Mat(filteredR),status, CV_FM_8POINT, 1, 0.999);
@@ -1320,7 +1322,7 @@ void StereoCamera::estimateEssential()
         }
     }
 
-    fprintf(stdout,"%lu Match After RANSAC Filtering \n",InliersL.size());
+    std::cout << "[StereoCamera] " << InliersL.size() << " Matches Left After RANSAC Filtering." << std::endl;
 
     if (this->InliersL.size()<10 || this->InliersR.size()<10 )
     {
@@ -1410,8 +1412,15 @@ bool StereoCamera::essentialDecomposition()
     Mat diff_angles=rvec_exp-rvec_new;
     Mat diff_tran=T_exp-t_est;
 
-    fprintf(stdout,"Angles Differences: %f %f %f\n",diff_angles.at<double>(0,0),diff_angles.at<double>(1,0),diff_angles.at<double>(2,0));
-    fprintf(stdout,"Translation Differences: %f %f %f\n",diff_tran.at<double>(0,0),diff_tran.at<double>(1,0),diff_tran.at<double>(2,0));
+    std::cout << "[StereoCamera] Angles Differences: " << diff_angles.at<double>(0,0) << " " <<
+                                                          diff_angles.at<double>(1,0) << " " <<
+                                                          diff_angles.at<double>(2,0) << std::endl;
+
+    std::cout << "[StereoCamera] Translation Differences: " << diff_tran.at<double>(0,0) << " " <<
+                                                               diff_tran.at<double>(1,0) << " " <<
+                                                               diff_tran.at<double>(2,0) << std::endl;
+
+
 
     // Magic numbers: rvec_new are the rotation angles, only vergence (rvec_new(1,0)) is allowed to be large
     // t_est is the translation estimated, it can change a little bit when joint 4 of the head is moving
@@ -2687,7 +2696,7 @@ void StereoCamera::setExpectedPosition(Mat &Rot, Mat &Tran)
 cv::Mat StereoCamera::remapDisparity(cv::Mat disp)
 {
 
-    cv::Mat dispTemp;
+    cv::Mat remapped;
 
     if (cameraChanged)
     {
@@ -2721,15 +2730,15 @@ cv::Mat StereoCamera::remapDisparity(cv::Mat disp)
     }
 
     Mat x;
-    remap(disp,dispTemp,this->MapperL,x,cv::INTER_LINEAR);
-    dispTemp.convertTo(dispTemp,CV_8U);
+    remap(disp,remapped,this->MapperL,x,cv::INTER_LINEAR);
+    remapped.convertTo(remapped,CV_8U);
 
 //        std::cout << "DOPO DISTTEMP CONVERTO" << std::endl;
 //        std::cout << disp.size() << std::endl;
 
-    if (use_elas)
-        disp.convertTo(disp, CV_16SC1, 16.0);
+//    if (use_elas)
+//        disp.convertTo(disp, CV_16SC1, 16.0);
 
-    return dispTemp;
+    return remapped;
 
 }

@@ -2,7 +2,7 @@
 # Author: Malafronte Damiano
 # CopyPolicy: Released under the terms of the GNU GPL v2.0.
 
-project(DispModule)
+project(DisparityModule)
 
 add_subdirectory(sgbm_cuda)
 

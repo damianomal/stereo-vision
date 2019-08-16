@@ -48,6 +48,30 @@ char const *debug_strings[] = {
 
 using namespace yarp::cv;
 
+void DispModule::printP()
+{
+    std::cout << "params ("
+              << this->stereo_parameters.minDisparity << " "
+              << this->useBestDisp << " "
+              << this->stereo_parameters.numberOfDisparities << " "
+              << this->stereo_parameters.SADWindowSize << " "
+              << this->stereo_parameters.disp12MaxDiff << " "
+              << this->stereo_parameters.preFilterCap << " "
+              << this->stereo_parameters.uniquenessRatio << " "
+              << this->stereo_parameters.speckleWindowSize << " "
+              << this->stereo_parameters.speckleRange << " "
+              << this->stereo_parameters.sigmaColorBLF << " "
+              << this->stereo_parameters.sigmaSpaceBLF << " "
+              << this->stereo_parameters.wls_lambda << " "
+              << this->stereo_parameters.wls_sigma << " "
+              << this->stereo_parameters.stereo_matching << " "
+              << this->stereo_parameters.BLFfiltering << " "
+              << this->stereo_parameters.WLSfiltering
+              << ")" << std::endl;
+
+}
+
+
 /******************************************************************************/
 bool DispModule::configure(ResourceFinder & rf)
 {
@@ -74,12 +98,11 @@ bool DispModule::configure(ResourceFinder & rf)
 
     // load the calibration infos from file
 
-    ResourceFinder localCalibration;
-    localCalibration.setDefaultContext("cameraCalibration");
-    localCalibration.setDefaultConfigFile(SFMFile.c_str());
-    localCalibration.configure(0,NULL);
+    this->localCalibration.setDefaultContext("cameraCalibration");
+    this->localCalibration.setDefaultConfigFile(SFMFile.c_str());
+    this->localCalibration.configure(0,NULL);
 
-    this->camCalibFile=localCalibration.getHomeContextPath();
+    this->camCalibFile=this->localCalibration.getHomeContextPath();
     this->camCalibFile+="/"+SFMFile;
 
     //
@@ -103,16 +126,17 @@ bool DispModule::configure(ResourceFinder & rf)
     Mat KL, KR, DistL, DistR;
 
     loadIntrinsics(rf,KL,KR,DistL,DistR);
-    loadExtrinsics(localCalibration,R0,T0,eyes0);
+//    loadExtrinsics(localCalibration,R0,T0,eyes0);
+    loadConfigurationFile(this->localCalibration,R0,T0,eyes0);
+
     eyes.resize(eyes0.length(),0.0);
 
     stereo->setIntrinsics(KL,KR,DistL,DistR);
 
     // initialize local stereo parameters
 
-    this->initializeStereoParams();
-
-    //
+    // initialize the matrices describing the
+    // transformation between reference systems
 
     this->HL_root=Mat::zeros(4,4,CV_64F);
     this->HR_root=Mat::zeros(4,4,CV_64F);
@@ -129,7 +153,7 @@ bool DispModule::configure(ResourceFinder & rf)
         this->stereo->setIntrinsics(KL,KR,zeroDist,zeroDist);
     }
 
-    std::cout << "[DEBUG] UseCalibrated: " << useCalibrated << std::endl;
+//    std::cout << "[DEBUG] UseCalibrated: " << useCalibrated << std::endl;
 
     //
 
@@ -159,7 +183,7 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else
     {
-        cout<<"Devices not available"<<endl;
+        cout<<"[DisparityModule] Devices not available"<<endl;
         return false;
     }
 
@@ -201,27 +225,31 @@ bool DispModule::configure(ResourceFinder & rf)
     // module has been invoked with
 
     if (rf.check("sgbm"))
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     else if(rf.check("sgbm_cuda"))
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
     else if(rf.check("libelas"))
-        this->stereo_matching = SM_MATCHING_ALG::LIBELAS;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::LIBELAS;
     else
-        this->stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
 
     if (rf.check("blf"))
-        this->BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
+        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
     else if(rf.check("blf_cuda"))
-        this->BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
+        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
     else
-        this->BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
+        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
 
     if (rf.check("wls"))
-        this->WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
+        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
     else if(rf.check("wls_lr"))
-        this->WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
+        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
     else
-        this->WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
+        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
+
+    // initializes the numerical stereo matching parameters
+
+    this->initializeStereoParams();
 
     // if specified via CMake, compile using the GUI
     // based on cvui.h and here checks whether to initialize
@@ -232,56 +260,49 @@ bool DispModule::configure(ResourceFinder & rf)
 
     if(this->debugWindow)
     {
-        this->gui.initializeGUI(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
-                            this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
-                            this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
-                            this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
-                            this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
+        this->gui.initializeGUI(this->stereo_parameters.minDisparity,
+                                this->stereo_parameters.numberOfDisparities,
+                                this->stereo_parameters.SADWindowSize,
+                                this->stereo_parameters.disp12MaxDiff,
+                                this->stereo_parameters.preFilterCap,
+                                this->stereo_parameters.uniquenessRatio,
+                                this->stereo_parameters.speckleWindowSize,
+                                this->stereo_parameters.speckleRange,
+                                this->stereo_parameters.sigmaColorBLF,
+                                this->stereo_parameters.sigmaSpaceBLF,
+                                this->stereo_parameters.wls_lambda,
+                                this->stereo_parameters.wls_sigma,
+                                this->stereo_parameters.BLFfiltering,
+                                this->stereo_parameters.WLSfiltering,
+                                this->stereo_parameters.stereo_matching);
     }
 #endif
-
-    //TODO: debug prints, remove them
-
-//    this->debug_count = 0;
-//    this->debug_num_timings = 11;
-
-//    debug_timings = new int[debug_num_timings];
-
-//    for(int i = 0; i < debug_num_timings; i++)
-//        this->debug_timings[i] = 0;
 
     // initialize the StereoMatcher object
 
     this->matcher = new StereoMatcherNew(rf, this->stereo);
+
+    this->matcher->setParameters(this->stereo_parameters.minDisparity,
+                                 this->stereo_parameters.numberOfDisparities,
+                                 this->stereo_parameters.SADWindowSize,
+                                 this->stereo_parameters.disp12MaxDiff,
+                                 this->stereo_parameters.preFilterCap,
+                                 this->stereo_parameters.uniquenessRatio,
+                                 this->stereo_parameters.speckleWindowSize,
+                                 this->stereo_parameters.speckleRange,
+                                 this->stereo_parameters.sigmaColorBLF,
+                                 this->stereo_parameters.sigmaSpaceBLF,
+                                 this->stereo_parameters.wls_lambda,
+                                 this->stereo_parameters.wls_sigma,
+                                 this->stereo_parameters.BLFfiltering,
+                                 this->stereo_parameters.WLSfiltering,
+                                 this->stereo_parameters.stereo_matching);
+
     this->matcher->updateCUDAParams();
-    this->matcher->setParameters(this->minDisparity, this->numberOfDisparities, this->SADWindowSize,
-                                 this->disp12MaxDiff, this->preFilterCap, this->uniquenessRatio,
-                                 this->speckleWindowSize, this->speckleRange, this->sigmaColorBLF,
-                                 this->sigmaSpaceBLF, this->wls_lambda, this->wls_sigma,
-                                 this->BLFfiltering, this->WLSfiltering, this->stereo_matching);
 
     return true;
 
 }
-
-/******************************************************************************/
-//cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
-//{
-
-//    cv::Mat repr;
-
-//    repr = disparity.clone();
-//    repr.convertTo(repr, CV_32FC1, 1./16);
-
-//    reprojectImageTo3D(repr, repr, Q, true);
-
-//    // TODO: missing rotation given RLRect
-
-//    extractChannel(repr, repr, 2);
-
-//    return repr;
-
-//}
 
 /******************************************************************************/
 cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
@@ -317,21 +338,24 @@ cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
 void DispModule::initializeStereoParams()
 {
     this->useBestDisp=true;
-    this->uniquenessRatio=15;
-    this->speckleWindowSize=50;
-    this->speckleRange=16;
-    this->SADWindowSize=7;
-    this->minDisparity=0;
-    this->preFilterCap=63;
-    this->disp12MaxDiff=0;
 
-    this->numberOfDisparities = 96;
+    this->stereo_parameters.uniquenessRatio=15;
+    this->stereo_parameters.speckleWindowSize=50;
+    this->stereo_parameters.speckleRange=16;
+    this->stereo_parameters.SADWindowSize=7;
+    this->stereo_parameters.minDisparity=0;
+    this->stereo_parameters.preFilterCap=63;
+    this->stereo_parameters.disp12MaxDiff=0;
 
-    this->sigmaColorBLF = 10.0;
-    this->sigmaSpaceBLF = 10.0;
+    this->stereo_parameters.numberOfDisparities = 96;
 
-    this->wls_lambda = 8000.;
-    this->wls_sigma = 1.5;
+    this->stereo_parameters.sigmaColorBLF = 10.0;
+    this->stereo_parameters.sigmaSpaceBLF = 10.0;
+
+    this->stereo_parameters.wls_lambda = 8000.;
+    this->stereo_parameters.wls_sigma = 1.5;
+
+    this->original_parameters = this->stereo_parameters;
 
 }
 
@@ -503,14 +527,86 @@ void DispModule::handleGuiUpdate()
         doSFM=true;
         mutexRecalibration.unlock();
 
-        this->gui.resetState();
+    }
+    else if(this->gui.toSaveCalibration())
+    {
+        std::cout << "[DisparityModule] Saving current calibration.." << std::endl;
+
+//        updateExtrinsics(R0,T0,eyes0,"STEREO_DISPARITY");
+        updateConfigurationFile(R0,T0,eyes0,"STEREO_DISPARITY");
+    }
+    else if(this->gui.toLoadParameters())
+    {
+        std::cout << "[DisparityModule] Loading stereo parameters from file.." << std::endl;
+
+//        updateExtrinsics(R0,T0,eyes0,"STEREO_DISPARITY");
+//        loadStereoParameters(this->localCalibration,R0,T0,eyes0);
+
+        this->stereo_parameters = this->original_parameters;
+
+        this->gui.setParams(this->stereo_parameters.minDisparity,
+                            this->stereo_parameters.numberOfDisparities,
+                            this->stereo_parameters.SADWindowSize,
+                            this->stereo_parameters.disp12MaxDiff,
+                            this->stereo_parameters.preFilterCap,
+                            this->stereo_parameters.uniquenessRatio,
+                            this->stereo_parameters.speckleWindowSize,
+                            this->stereo_parameters.speckleRange,
+                            this->stereo_parameters.sigmaColorBLF,
+                            this->stereo_parameters.sigmaSpaceBLF,
+                            this->stereo_parameters.wls_lambda,
+                            this->stereo_parameters.wls_sigma,
+                            this->stereo_parameters.BLFfiltering,
+                            this->stereo_parameters.WLSfiltering,
+                            this->stereo_parameters.stereo_matching);
+
+        this->matcher->setParameters(this->stereo_parameters.minDisparity,
+                                     this->stereo_parameters.numberOfDisparities,
+                                     this->stereo_parameters.SADWindowSize,
+                                     this->stereo_parameters.disp12MaxDiff,
+                                     this->stereo_parameters.preFilterCap,
+                                     this->stereo_parameters.uniquenessRatio,
+                                     this->stereo_parameters.speckleWindowSize,
+                                     this->stereo_parameters.speckleRange,
+                                     this->stereo_parameters.sigmaColorBLF,
+                                     this->stereo_parameters.sigmaSpaceBLF,
+                                     this->stereo_parameters.wls_lambda,
+                                     this->stereo_parameters.wls_sigma,
+                                     this->stereo_parameters.BLFfiltering,
+                                     this->stereo_parameters.WLSfiltering,
+                                     this->stereo_parameters.stereo_matching);
+
+        this->matcher->updateCUDAParams();
+    }
+    else if(this->gui.toSaveParameters())
+    {
+        std::cout << "[DisparityModule] Saving stereo parameters.." << std::endl;
+
+//        updateExtrinsics(R0,T0,eyes0,"STEREO_DISPARITY");
+        updateConfigurationFile(R0,T0,eyes0,"STEREO_DISPARITY");
+
     }
     else
     {
+
+        this->gui.getParams(this->stereo_parameters.minDisparity, this->stereo_parameters.numberOfDisparities, this->stereo_parameters.SADWindowSize,
+                            this->stereo_parameters.disp12MaxDiff, this->stereo_parameters.preFilterCap, this->stereo_parameters.uniquenessRatio,
+                            this->stereo_parameters.speckleWindowSize, this->stereo_parameters.speckleRange, this->stereo_parameters.sigmaColorBLF,
+                            this->stereo_parameters.sigmaSpaceBLF, this->stereo_parameters.wls_lambda, this->stereo_parameters.wls_sigma,
+                            this->stereo_parameters.BLFfiltering, this->stereo_parameters.WLSfiltering, this->stereo_parameters.stereo_matching);
+
+        this->matcher->setParameters(this->stereo_parameters.minDisparity, this->stereo_parameters.numberOfDisparities, this->stereo_parameters.SADWindowSize,
+                                     this->stereo_parameters.disp12MaxDiff, this->stereo_parameters.preFilterCap, this->stereo_parameters.uniquenessRatio,
+                                     this->stereo_parameters.speckleWindowSize, this->stereo_parameters.speckleRange, this->stereo_parameters.sigmaColorBLF,
+                                     this->stereo_parameters.sigmaSpaceBLF, this->stereo_parameters.wls_lambda, this->stereo_parameters.wls_sigma,
+                                     this->stereo_parameters.BLFfiltering, this->stereo_parameters.WLSfiltering, this->stereo_parameters.stereo_matching);
+
         this->matcher->updateCUDAParams();
-        this->gui.resetState();
 
     }
+
+    this->gui.resetState();
+
 
 }
 #endif
@@ -530,6 +626,8 @@ bool DispModule::updateModule()
 
     if ((yarp_imgL==NULL) || (yarp_imgR==NULL))
         return true;
+
+//    this->printP();
 
     // read encoders
 
@@ -558,7 +656,7 @@ bool DispModule::updateModule()
 
     this->stereo->setImages(leftMat,rightMat);
 
-    std::cout << "LOOP - GuiUpdate\n";
+//    std::cout << "LOOP - GuiUpdate\n";
 
 #ifdef USE_GUI
     if(this->debugWindow && this->gui.isUpdated())
@@ -567,7 +665,7 @@ bool DispModule::updateModule()
 
     mutexRecalibration.lock();
 
-    std::cout << "LOOP - Recalibrate\n";
+//    std::cout << "LOOP - Recalibrate\n";
 
     if(doSFM)
         this->recalibrate();
@@ -576,7 +674,7 @@ bool DispModule::updateModule()
 
     mutexDisp.lock();
 
-    std::cout << "LOOP - compute disp\n";
+//    std::cout << "LOOP - compute disp\n";
 
     // compute the current disparity map
 
@@ -584,53 +682,56 @@ bool DispModule::updateModule()
 
     mutexDisp.unlock();
 
-    std::cout << "LOOP - filter blf\n";
+//    std::cout << "LOOP - filter blf\n";
 
     // execute the bilateral filtering of the
     // disparity map, if selected
 
     matcher->filterBLF("base");
 
-    std::cout << "LOOP - filter wls\n";
+//    std::cout << "LOOP - filter wls\n";
 
     // execute the WLS filtering, if selected
 
     matcher->filterWLS("blf");
 
-    std::cout << "LOOP - before disp_vis\n";
+//    std::cout << "LOOP - before disp_vis\n";
 
     // gets the (possibly) blf-filtered disparity map
 
-    cv::Mat disp_vis = matcher->getDisparity("blf");
+    cv::Mat disp_vis = matcher->getDisparity("wls");
 
     // TODO: DEBUG, to be removed
 
-    std::cout << disp_vis.size() << std::endl;
-    std::cout << disp_vis.empty() << std::endl;
+//    std::cout << disp_vis.size() << std::endl;
+//    std::cout << disp_vis.empty() << std::endl;
 
-    double src_min, src_max;
-    cv::minMaxLoc(disp_vis, &src_min, &src_max);
+//    double src_min, src_max;
+//    cv::minMaxLoc(disp_vis, &src_min, &src_max);
 
-    std::cout << src_min << std::endl;
-    std::cout << src_max << std::endl;
+//    std::cout << src_min << std::endl;
+//    std::cout << src_max << std::endl;
 
-    std::cout << "LOOP - after disp_vis\n";
+//    std::cout << "LOOP - after disp_vis\n";
 
     // if the disparity output port is active, sends
     // the current (filtered) one
 
-    if (outDisp.getOutputCount()>0 && !disp_vis.empty())
+    if (outDisp.getOutputCount() > 0 && !disp_vis.empty())
     {
         ImageOf<PixelMono> &outim = outDisp.prepare();
 
-        if(this->stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
+        if(this->stereo_parameters.stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
             getDisparityVis(disp_vis, disp_vis, 3);
+
+//        if(this->stereo_parameters.stereo_matching == SM_MATCHING_ALG::LIBELAS)
+//            getDisparityVis(disp_vis, disp_vis, 0.5);
 
         outim = fromCvMat<PixelMono>(disp_vis);
         outDisp.write();
     }
 
-    std::cout << "LOOP - after disp output\n";
+//    std::cout << "LOOP - after disp output\n";
 
     // if the output port is active, computes the depth
     // map for the current disparity map (the filtered one,
@@ -643,7 +744,7 @@ bool DispModule::updateModule()
         if (disp_depth.empty())
         {
             std::cout << "[DisparityModule] Impossible to compute the depth map.." << std::endl <<
-                         "[DisparityModule] the disparity map is not available!" << std::endl;
+                         "[DisparityModule] ..the disparity map is not available!" << std::endl;
         }
         else
         {
@@ -658,7 +759,7 @@ bool DispModule::updateModule()
         }
     }
 
-    std::cout << "LOOP - after depth output\n";
+//    std::cout << "LOOP - after depth output\n";
 
     // if the GUI is used, handles the interaction
     // with it and updates its state
@@ -667,13 +768,13 @@ bool DispModule::updateModule()
     if(this->debugWindow && !this->gui.isDone())
         this->gui.updateGUI();
 
-    std::cout << "LOOP - after gui update\n";
+//    std::cout << "LOOP - after gui update\n";
 
     if(this->gui.isDone())
         this->gui.killGUI();
 #endif
 
-    std::cout << "LOOP - after gui everything\n";
+//    std::cout << "LOOP - after gui everything\n";
 
     return true;
 }
@@ -1112,6 +1213,14 @@ bool DispModule::updateModule()
 
 //            std::cout << "GGG" << std::endl;
 
+    std::cout << disp_vis.size() << std::endl;
+    std::cout << disp_vis.empty() << std::endl;
+
+    double src_min, src_max;
+    cv::minMaxLoc(disp_vis, &src_min, &src_max);
+
+    std::cout << src_min << std::endl;
+    std::cout << src_max << std::endl;
             outDepth.write();
 
         }
@@ -1185,7 +1294,7 @@ bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, 
             eyes[i]=bEyes->get(i).asDouble();
     }
 
-    cout<<"read eyes configuration = ("<<eyes.toString(3,3)<<")"<<endl;
+    cout<<"[DisparityModule] Read Eyes Configuration = ("<<eyes.toString(3,3)<<")"<<endl;
 
     if (Bottle *pXo=extrinsics.find("HN").asList())
     {
@@ -1204,6 +1313,113 @@ bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, 
 
     return true;
 }
+
+/******************************************************************************/
+bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes)
+{
+
+    Bottle extrinsics=rf.findGroup("STEREO_DISPARITY");
+
+    // loads the eyes configuration from file
+
+    eyes.resize(3,0.0);
+    if (Bottle *bEyes=extrinsics.find("eyes").asList())
+    {
+        size_t sz = std::min(eyes.length(),(size_t)bEyes->size());
+        for (size_t i=0; i<sz; i++)
+            eyes[i] = bEyes->get(i).asDouble();
+    }
+
+    cout << "[DisparityModule] Read Eyes Configuration = (" << eyes.toString(3,3) << ")" << endl;
+
+    // loads the calibration matrix associated with the
+    // stereo system
+
+    if (Bottle *pXo=extrinsics.find("HN").asList())
+    {
+        Ro=Mat::zeros(3,3,CV_64FC1);
+        To=Mat::zeros(3,1,CV_64FC1);
+        for (int i=0; i<(pXo->size()-4); i+=4)
+        {
+            Ro.at<double>(i/4,0) = pXo->get(i).asDouble();
+            Ro.at<double>(i/4,1) = pXo->get(i+1).asDouble();
+            Ro.at<double>(i/4,2) = pXo->get(i+2).asDouble();
+            To.at<double>(i/4,0) = pXo->get(i+3).asDouble();
+        }
+    }
+    else
+        return false;
+
+    // loads the stereo parameters from the configuration file
+
+    if (Bottle *pXo=extrinsics.find("params").asList())
+    {
+
+        this->stereo_parameters.minDisparity =        pXo->get(0).asInt();
+        this->useBestDisp =                           pXo->get(1).asBool();
+        this->stereo_parameters.numberOfDisparities = pXo->get(2).asInt();
+        this->stereo_parameters.SADWindowSize =       pXo->get(3).asInt();
+        this->stereo_parameters.disp12MaxDiff =       pXo->get(4).asInt();
+        this->stereo_parameters.preFilterCap =        pXo->get(5).asInt();
+        this->stereo_parameters.uniquenessRatio =     pXo->get(6).asInt();
+        this->stereo_parameters.speckleWindowSize =   pXo->get(7).asInt();
+        this->stereo_parameters.speckleRange =        pXo->get(8).asInt();
+
+        this->stereo_parameters.sigmaColorBLF =       pXo->get(9).asDouble();
+        this->stereo_parameters.sigmaSpaceBLF =       pXo->get(10).asDouble();
+
+        this->stereo_parameters.wls_lambda =          pXo->get(11).asDouble();
+        this->stereo_parameters.wls_sigma =           pXo->get(12).asDouble();
+
+        this->stereo_parameters.stereo_matching =     static_cast<SM_MATCHING_ALG>(pXo->get(13).asInt());
+        this->stereo_parameters.BLFfiltering =        static_cast<SM_BLF_FILTER>(pXo->get(14).asInt());
+        this->stereo_parameters.WLSfiltering =        static_cast<SM_WLS_FILTER>(pXo->get(15).asInt());
+
+    }
+    else
+        return false;
+
+    return true;
+}
+
+
+///******************************************************************************/
+//bool DispModule::loadStereoParameters(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes)
+//{
+
+//    Bottle extrinsics=rf.findGroup("STEREO_DISPARITY");
+
+//    // loads the stereo parameters from the configuration file
+
+//    if (Bottle *pXo=extrinsics.find("params").asList())
+//    {
+
+//        this->stereo_parameters.minDisparity =        pXo->get(0).asInt();
+//        this->useBestDisp =                           pXo->get(1).asBool();
+//        this->stereo_parameters.numberOfDisparities = pXo->get(2).asInt();
+//        this->stereo_parameters.SADWindowSize =       pXo->get(3).asInt();
+//        this->stereo_parameters.disp12MaxDiff =       pXo->get(4).asInt();
+//        this->stereo_parameters.preFilterCap =        pXo->get(5).asInt();
+//        this->stereo_parameters.uniquenessRatio =     pXo->get(6).asInt();
+//        this->stereo_parameters.speckleWindowSize =   pXo->get(7).asInt();
+//        this->stereo_parameters.speckleRange =        pXo->get(8).asInt();
+
+//        this->stereo_parameters.sigmaColorBLF =       pXo->get(9).asDouble();
+//        this->stereo_parameters.sigmaSpaceBLF =       pXo->get(10).asDouble();
+
+//        this->stereo_parameters.wls_lambda =          pXo->get(11).asDouble();
+//        this->stereo_parameters.wls_sigma =           pXo->get(12).asDouble();
+
+//        this->stereo_parameters.stereo_matching =     static_cast<SM_MATCHING_ALG>(pXo->get(13).asInt());
+//        this->stereo_parameters.BLFfiltering =        static_cast<SM_BLF_FILTER>(pXo->get(14).asInt());
+//        this->stereo_parameters.WLSfiltering =        static_cast<SM_WLS_FILTER>(pXo->get(15).asInt());
+
+//    }
+//    else
+//        return false;
+
+//    return true;
+//}
 
 /******************************************************************************/
 bool DispModule::loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL,
@@ -1280,11 +1496,22 @@ bool DispModule::updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
         out << endl;
         out << "["+groupname+"]" << endl;
         out << "eyes (" << eyes.toString() << ")" << endl;
-        out << "HN (" << Rot.at<double>(0,0) << " " << Rot.at<double>(0,1) << " " << Rot.at<double>(0,2) << " " << Tr.at<double>(0,0) << " "
-                << Rot.at<double>(1,0) << " " << Rot.at<double>(1,1) << " " << Rot.at<double>(1,2) << " " << Tr.at<double>(1,0) << " "
-                << Rot.at<double>(2,0) << " " << Rot.at<double>(2,1) << " " << Rot.at<double>(2,2) << " " << Tr.at<double>(2,0) << " "
-                << 0.0                 << " " << 0.0                 << " " << 0.0                 << " " << 1.0                << ")"
-                << endl;
+        out << "HN ("
+            << Rot.at<double>(0,0) << " "
+            << Rot.at<double>(0,1) << " "
+            << Rot.at<double>(0,2) << " "
+            << Tr.at<double>(0,0) << " "
+            << Rot.at<double>(1,0) << " "
+            << Rot.at<double>(1,1) << " "
+            << Rot.at<double>(1,2) << " "
+            << Tr.at<double>(1,0) << " "
+            << Rot.at<double>(2,0) << " "
+            << Rot.at<double>(2,1) << " "
+            << Rot.at<double>(2,2) << " "
+            << Tr.at<double>(2,0) << " "
+            << 0.0 << " " << 0.0 << " " << 0.0 << " " << 1.0                << ")"
+            << endl;
+
         out.close();
         return true;
     }
@@ -1292,6 +1519,60 @@ bool DispModule::updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
         return false;
 }
 
+/******************************************************************************/
+bool DispModule::updateConfigurationFile(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
+        const string& groupname)
+{
+    ofstream out;
+    out.open(camCalibFile.c_str());
+    if (out.is_open())
+    {
+        out << endl;
+        out << "["+groupname+"]" << endl;
+        out << "eyes (" << eyes.toString() << ")" << endl;
+        out << "HN ("
+            << Rot.at<double>(0,0) << " "
+            << Rot.at<double>(0,1) << " "
+            << Rot.at<double>(0,2) << " "
+            << Tr.at<double>(0,0) << " "
+            << Rot.at<double>(1,0) << " "
+            << Rot.at<double>(1,1) << " "
+            << Rot.at<double>(1,2) << " "
+            << Tr.at<double>(1,0) << " "
+            << Rot.at<double>(2,0) << " "
+            << Rot.at<double>(2,1) << " "
+            << Rot.at<double>(2,2) << " "
+            << Tr.at<double>(2,0) << " "
+            << 0.0 << " " << 0.0 << " " << 0.0 << " " << 1.0                << ")"
+            << endl;
+
+        // TODO: change the following code and insert the stere oparameters struct
+
+        out << "params ("
+            << this->stereo_parameters.minDisparity << " "
+            << this->useBestDisp << " "
+            << this->stereo_parameters.numberOfDisparities << " "
+            << this->stereo_parameters.SADWindowSize << " "
+            << this->stereo_parameters.disp12MaxDiff << " "
+            << this->stereo_parameters.preFilterCap << " "
+            << this->stereo_parameters.uniquenessRatio << " "
+            << this->stereo_parameters.speckleWindowSize << " "
+            << this->stereo_parameters.speckleRange << " "
+            << this->stereo_parameters.sigmaColorBLF << " "
+            << this->stereo_parameters.sigmaSpaceBLF << " "
+            << this->stereo_parameters.wls_lambda << " "
+            << this->stereo_parameters.wls_sigma << " "
+            << this->stereo_parameters.stereo_matching << " "
+            << this->stereo_parameters.BLFfiltering << " "
+            << this->stereo_parameters.WLSfiltering << ")"
+            << endl;
+
+        out.close();
+        return true;
+    }
+    else
+        return false;
+}
 
 /******************************************************************************/
 void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
@@ -1302,14 +1583,14 @@ void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
     this->mutexDisp.lock();
 
     this->useBestDisp=_useBestDisp;
-    this->uniquenessRatio=_uniquenessRatio;
-    this->speckleWindowSize=_speckleWindowSize;
-    this->speckleRange=_speckleRange;
-    this->numberOfDisparities=_numberOfDisparities;
-    this->SADWindowSize=_SADWindowSize;
-    this->minDisparity=_minDisparity;
-    this->preFilterCap=_preFilterCap;
-    this->disp12MaxDiff=_disp12MaxDiff;
+    this->stereo_parameters.uniquenessRatio=_uniquenessRatio;
+    this->stereo_parameters.speckleWindowSize=_speckleWindowSize;
+    this->stereo_parameters.speckleRange=_speckleRange;
+    this->stereo_parameters.numberOfDisparities=_numberOfDisparities;
+    this->stereo_parameters.SADWindowSize=_SADWindowSize;
+    this->stereo_parameters.minDisparity=_minDisparity;
+    this->stereo_parameters.preFilterCap=_preFilterCap;
+    this->stereo_parameters.disp12MaxDiff=_disp12MaxDiff;
 
     this->mutexDisp.unlock();
 
@@ -1554,7 +1835,7 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
             reply.addString("ACK");
         }
         else
-            reply.addString("Calibration failed after 5 trials.. Please show a non planar scene.");
+            reply.addString("[DisparityModule] Calibration failed after 5 trials.. Please show a non planar scene.");
 
         return true;
     }
@@ -1580,8 +1861,16 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         int dispNum=command.get(1).asInt();
         if(dispNum%32==0)
         {
-            this->numberOfDisparities=dispNum;
-            this->setDispParameters(useBestDisp,uniquenessRatio,speckleWindowSize,speckleRange,numberOfDisparities,SADWindowSize,minDisparity,preFilterCap,disp12MaxDiff);
+            this->stereo_parameters.numberOfDisparities=dispNum;
+            this->setDispParameters(useBestDisp,
+                                    this->stereo_parameters.uniquenessRatio,
+                                    this->stereo_parameters.speckleWindowSize,
+                                    this->stereo_parameters.speckleRange,
+                                    this->stereo_parameters.numberOfDisparities,
+                                    this->stereo_parameters.SADWindowSize,
+                                    this->stereo_parameters.minDisparity,
+                                    this->stereo_parameters.preFilterCap,
+                                    this->stereo_parameters.disp12MaxDiff);
             reply.addString("ACK");
             return true;
         }
@@ -1595,17 +1884,23 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
     if (command.get(0).asString()=="setMinDisp")
     {
         int dispNum=command.get(1).asInt();
-        this->minDisparity=dispNum;
-        this->setDispParameters(useBestDisp,uniquenessRatio,speckleWindowSize,
-                speckleRange,numberOfDisparities,SADWindowSize,
-                minDisparity,preFilterCap,disp12MaxDiff);
+        this->stereo_parameters.minDisparity=dispNum;
+        this->setDispParameters(useBestDisp,
+                                this->stereo_parameters.uniquenessRatio,
+                                this->stereo_parameters.speckleWindowSize,
+                                this->stereo_parameters.speckleRange,
+                                this->stereo_parameters.numberOfDisparities,
+                                this->stereo_parameters.SADWindowSize,
+                                this->stereo_parameters.minDisparity,
+                                this->stereo_parameters.preFilterCap,
+                                this->stereo_parameters.disp12MaxDiff);
         reply.addString("ACK");
         return true;
     }
 
     if (command.get(0).asString()=="set" && command.size()==10)
     {
-        bool bestDisp=command.get(1).asInt() ? true : false;
+        bool useBestDisp=command.get(1).asInt() ? true : false;
         int uniquenessRatio=command.get(2).asInt();
         int speckleWindowSize=command.get(3).asInt();
         int speckleRange=command.get(4).asInt();
@@ -1615,9 +1910,16 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         int preFilterCap=command.get(8).asInt();
         int disp12MaxDiff=command.get(9).asInt();
 
-        this->setDispParameters(bestDisp,uniquenessRatio,speckleWindowSize,
-                                speckleRange,numberOfDisparities,SADWindowSize,
-                                minDisparity,preFilterCap,disp12MaxDiff);
+        this->setDispParameters(useBestDisp,
+                                uniquenessRatio,
+                                speckleWindowSize,
+                                speckleRange,
+                                numberOfDisparities,
+                                SADWindowSize,
+                                minDisparity,
+                                preFilterCap,
+                                disp12MaxDiff);
+
         reply.addString("ACK");
     }
     else if (command.get(0).asString()=="Rect")
@@ -1674,12 +1976,12 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
             doBLF = true;
             reply.addString("Bilateral filter activated.");
         }
-        sigmaColorBLF = command.get(1).asDouble();
-        sigmaSpaceBLF = command.get(2).asDouble();
+        this->stereo_parameters.sigmaColorBLF = command.get(1).asDouble();
+        this->stereo_parameters.sigmaSpaceBLF = command.get(2).asDouble();
         reply.addString("BLF sigmaColor ");
-        reply.addDouble(sigmaColorBLF);
+        reply.addDouble(this->stereo_parameters.sigmaColorBLF);
         reply.addString("BLF sigmaSpace ");
-        reply.addDouble(sigmaSpaceBLF);
+        reply.addDouble(this->stereo_parameters.sigmaSpaceBLF);
     }
     else if (command.get(0).asString()=="doBLF")
     {
@@ -1700,8 +2002,8 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
                 reply.addString("Bilateral Filter ON");
             }
         }
-        reply.addDouble(sigmaColorBLF);
-        reply.addDouble(sigmaSpaceBLF);
+        reply.addDouble(this->stereo_parameters.sigmaColorBLF);
+        reply.addDouble(this->stereo_parameters.sigmaSpaceBLF);
     }
     else
         reply.addString("NACK");

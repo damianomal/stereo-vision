@@ -1,9 +1,11 @@
 #DispModule.thrift
 service DispModule {
 	
-	bool save();
+	bool save_calibration();
 	bool calibrate();
 	bool toggle_gui();
+	bool save_parameters();
+	bool default_parameters();
 	
 	bool set_blf(1:string state);
 	bool set_wls(1:string state);

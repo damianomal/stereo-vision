@@ -10,28 +10,6 @@
 
 // the struct containing the parameters handled by the GUI
 
-typedef struct {
-
-    int uniquenessRatio;
-    int speckleWindowSize;
-    int speckleRange;
-    int numberOfDisparities;
-    int SADWindowSize;
-    int minDisparity;
-    int preFilterCap;
-    int disp12MaxDiff;
-
-    double sigmaColorBLF;
-    double sigmaSpaceBLF;
-    double wls_lambda;
-    double wls_sigma;
-
-    SM_BLF_FILTER BLFfiltering;
-    SM_WLS_FILTER WLSfiltering;
-    SM_MATCHING_ALG stereo_matching;
-
-} Params;
-
 
 
 class GUI
@@ -52,7 +30,7 @@ private:
     bool save_calibration;
 
     // flag set to True if the user chose to revert the matching/filtering parameters to their default values
-    bool set_default;
+    bool load_parameters;
 
     // flag set to True if the user selected
     bool save_parameters;
@@ -71,6 +49,7 @@ private:
     int BLFfiltering_id;
     int WLSfiltering_id;
     int stereo_matching_id;
+    int num_disparities_id;
 
 public:
 
@@ -124,6 +103,25 @@ public:
                    SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
                    SM_MATCHING_ALG& stereo_matching);
 
+
+    /**
+    * XXXXXXXXXXXXXXX
+    * @param XXX XXXXXXXXXXXXXXX
+    * @param XXX XXXXXXXXXXXXXXX
+    * @param XXX XXXXXXXXXXXXXXX
+    * @param XXX XXXXXXXXXXXXXXX
+    * @param XXX XXXXXXXXXXXXXXX
+    *
+    */
+    void setParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                   int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                   int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                   double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
+                   SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
+                   SM_MATCHING_ALG& stereo_matching);
+
+
+
     /**
     * Checks whether the GUI has been closed
     * @return True if the GUI has been closed, False otherwise
@@ -137,13 +135,6 @@ public:
     *
     */
     bool isUpdated();
-
-    /**
-    * Sets the state of the interface to the one specified
-    * @param v the new update state of the interface
-    *
-    */
-    void setUpdated(bool v);
 
     /**
      * Resets the GUI internal update flags
@@ -173,6 +164,19 @@ public:
     */
     bool toSaveCalibration();
 
+    /**
+    * Checks whether the user wants to reload the stereo parameters from file
+    * @return True if the Default Param. button has been pressed, False otherwise
+    *
+    */
+    bool toLoadParameters();
+
+    /**
+    * Checks whether the user wants to save the stereo parameters to file
+    * @return True if the Ssve Parameters button has been pressed, False otherwise
+    *
+    */
+    bool toSaveParameters();
 
     /**
     * XXXXXXXXXXXXXXX

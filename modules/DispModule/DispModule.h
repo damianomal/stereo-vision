@@ -300,31 +300,37 @@ class DispModule: public yarp::os::RFModule
     // stereo matching parameters
 
     bool useBestDisp;
-    int uniquenessRatio;
-    int speckleWindowSize;
-    int speckleRange;
-    int numberOfDisparities;
-    int SADWindowSize;
-    int minDisparity;
-    int preFilterCap;
-    int disp12MaxDiff;
+//    int uniquenessRatio;
+//    int speckleWindowSize;
+//    int speckleRange;
+//    int numberOfDisparities;
+//    int SADWindowSize;
+//    int minDisparity;
+//    int preFilterCap;
+//    int disp12MaxDiff;
     bool doSFM;
     bool calibUpdated;
     bool debugWindow;
-    double sigmaColorBLF;
-    double sigmaSpaceBLF;
-    double wls_lambda;
-    double wls_sigma;
+//    double sigmaColorBLF;
+//    double sigmaSpaceBLF;
+//    double wls_lambda;
+//    double wls_sigma;
     bool doBLF;
     bool useWLSfiltering;
     bool usePorts;
     bool left_right;
+
+    Params stereo_parameters, original_parameters;
 
     // mutex and other handles needed by the module
 
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
+
+    //
+
+    ResourceFinder localCalibration;
 
     // objects to interfare with the
 
@@ -348,6 +354,31 @@ class DispModule: public yarp::os::RFModule
     *
     */
     bool loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL, Mat &DistR);
+
+
+    /**
+    * Loads the cameras intrinsic matrices and the stereo disparity parameters
+    * @param rf the ResourceFinder object
+    * @param KL left camera intrinsic parameters matrix
+    * @param KR right camera intrinsic parameters matrix
+    * @param DistL left camera distortion parameters
+    * @param DistR right camera distortion parameters
+    * @return True if the loading is successfull, False otherwise
+    *
+    */
+    bool loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
+
+    /**
+    * Loads the cameras intrinsic matrices and the stereo disparity parameters
+    * @param rf the ResourceFinder object
+    * @param KL left camera intrinsic parameters matrix
+    * @param KR right camera intrinsic parameters matrix
+    * @param DistL left camera distortion parameters
+    * @param DistR right camera distortion parameters
+    * @return True if the loading is successfull, False otherwise
+    *
+    */
+    bool loadStereoParameters(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
 
     /**
     * Builds a 4x4 rototraslation matrix starting from the corresponding rotation matrix and translation vector
@@ -381,8 +412,6 @@ class DispModule: public yarp::os::RFModule
     *
     */
     void convert(Mat& mat, Matrix& matrix);
-//    void fillWorld3D(ImageOf<PixelRgbFloat> &worldCartImg, ImageOf<PixelRgbFloat> &worldCylImg);
-//    void floodFill(const Point &seed,const Point3f &p0, const double dist, set<int> &visited, Bottle &res);
 
     /**
     * Loads the extrinsics parameters of the camera system, via the ResourceFinder
@@ -405,6 +434,17 @@ class DispModule: public yarp::os::RFModule
     *
     */
     bool updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
+
+    /**
+    * Updates the extrinsics parameters and the stereo parameters within the local configuration file
+    * @param Rot estimated rotation  of the right camera with respect to the Left one
+    * @param Tr estimated translation of the right camera with respect to the Left one
+    * @param eyes the eyes state when the last calibration has been executed
+    * @param groupname Nname of the properties associated with the stereo system to be written within the configuration file
+    * @return
+    *
+    */
+    bool updateConfigurationFile(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes, const string& groupname);
 
     /**
     * Updates the stereo system translation and rotation parameters by getting the pose of the eyes with respect to the ROOT reference frame
@@ -454,9 +494,9 @@ class DispModule: public yarp::os::RFModule
 
     bool init;
 
-    SM_BLF_FILTER BLFfiltering;
-    SM_WLS_FILTER WLSfiltering;
-    SM_MATCHING_ALG stereo_matching;
+//    SM_BLF_FILTER BLFfiltering;
+//    SM_WLS_FILTER WLSfiltering;
+//    SM_MATCHING_ALG stereo_matching;
 
     SGM_PARAMS cuda_params, params_right;
 
@@ -524,5 +564,8 @@ public:
 
     DispModule();
     ~DispModule();
+
+    void printP();
+
 
 };

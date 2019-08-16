@@ -2493,7 +2493,7 @@ const int TRACKBAR_OFFSET = 45;
 const int RADIOBUTTON_OFFSET = 30;
 const int BUTTON_OFFSET = 40;
 
-namespace cvuimine {
+namespace cvuiw {
 
 	typedef struct {
 
@@ -2638,7 +2638,7 @@ namespace cvuimine {
 		return TRACKBAR_OFFSET*trackbars + RADIOBUTTON_OFFSET*radioButtons + BUTTON_OFFSET*button_lines + 20;
 	}
 
-} // namespace cvuimine
+} // namespace cvuiw
 
 
 // Final adjustments that are platform-dependent
