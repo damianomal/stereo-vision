@@ -513,7 +513,6 @@ void StereoCamera::rectifyImages()
     {
         mutex->wait();
         stereoRectify(this->Kleft, this->DistL, this->Kright, this->DistR, img_size, this->R, this->T, this->RLrect, this->RRrect, this->PLrect, this->PRrect, this->Q, -1);
-
         mutex->post();
     }
 
@@ -523,11 +522,11 @@ void StereoCamera::rectifyImages()
         initUndistortRectifyMap(this->Kright,  this->DistR, this->RRrect, this->PRrect, img_size, CV_32FC1, this->map21, this->map22);
     }
 
-    Mat img1r, img2r;
-    remap(this->imleft, img1r, this->map11, this->map12, cv::INTER_LINEAR);
-    remap(this->imright, img2r, this->map21,this->map22, cv::INTER_LINEAR);
-    imgLeftRect=img1r;
-    imgRightRect=img2r;
+//    Mat img1r, img2r;
+    remap(this->imleft, this->imgLeftRect, this->map11, this->map12, cv::INTER_LINEAR);
+    remap(this->imright, this->imgRightRect, this->map21,this->map22, cv::INTER_LINEAR);
+//    this->imgLeftRect=img1r;
+//    this->imgRightRect=img2r;
 
 }
 
