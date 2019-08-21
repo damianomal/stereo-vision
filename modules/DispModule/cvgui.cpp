@@ -47,6 +47,8 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
 
 //    std::cout << "GUI - initializeGUI end\n";
 
+    this->refine_th = 0;
+
     this->convertEnumToID();
     this->initializeGUI();
 }
@@ -63,7 +65,7 @@ void GUI::initializeGUI()
 
     int gui_width = 450; // separate only for the sake of clarity in the initialization
 
-    frame = cv::Mat(cv::Size(gui_width, cvuiw::estimateHeight(11,4,2)), CV_8UC3);
+    frame = cv::Mat(cv::Size(gui_width, cvuiw::estimateHeight(12,4,2)), CV_8UC3);
     cvui::init(WINDOW_NAME, 3);
 
 }
@@ -101,6 +103,7 @@ void GUI::updateGUI()
 
     // 1. Stereo Matching and filtering parameters
 
+    this->updated |= cvuiw::trackbar<int>("refineTh", frame, &(this->refine_th), 0, 50, 1, "%1.Lf", cvui::TRACKBAR_HIDE_LABELS);
     this->updated |= cvuiw::trackbar<int>("minDisparity", frame, &(this->params.minDisparity), 0, 20, 1, "%1.Lf", cvui::TRACKBAR_HIDE_LABELS);
     this->updated |= cvuiw::trackbar<int>("SADWindowSize", frame, &(this->params.SADWindowSize), 3, 31, 1, "%1.Lf", cvui::TRACKBAR_HIDE_LABELS);
     this->updated |= cvuiw::trackbar<int>("disp12MaxDiff", frame, &(this->params.disp12MaxDiff), 0, 30, 1, "%1.Lf", cvui::TRACKBAR_HIDE_LABELS);
@@ -115,10 +118,10 @@ void GUI::updateGUI()
 
     // 2. Multiple choice controls
 
-    this->updated |= cvuiw::radioButtons(frame, "Num. of Disparities:", {"32", "64", "96", "128"}, {20, 65, 110, 155}, 2);
-    this->updated |= cvuiw::radioButtons(frame, "Stereo Matching Alg.:", {"SGBM", "SGBM_CUDA", "LibElas"}, {20, 90, 190}, 0);
-    this->updated |= cvuiw::radioButtons(frame, "Bilateral Filtering:", {"No BLF", "Original BLF", "CUDA BLF"}, {20, 90, 190}, 0);
-    this->updated |= cvuiw::radioButtons(frame, "Weigthed LS Filtering:", {"No WLS", "WLS", "WLS w/ lr cons."}, {20, 100, 155}, 0);
+    this->updated |= cvuiw::radioButtons(frame, "Num. of Disparities:", {"32", "64", "96", "128"}, {20, 65, 110, 155}, this->num_disparities_id);
+    this->updated |= cvuiw::radioButtons(frame, "Stereo Matching Alg.:", {"SGBM", "SGBM_CUDA", "LibElas"}, {20, 90, 190}, this->stereo_matching_id);
+    this->updated |= cvuiw::radioButtons(frame, "Bilateral Filtering:", {"No BLF", "Original BLF", "CUDA BLF"}, {20, 90, 190}, this->BLFfiltering_id);
+    this->updated |= cvuiw::radioButtons(frame, "Weigthed LS Filtering:", {"No WLS", "WLS", "WLS w/ lr cons."}, {20, 100, 155}, this->WLSfiltering_id);
 
     // 3. Button to trigger the recalibration of the system
 
@@ -367,4 +370,15 @@ void GUI::resetState()
     this->save_calibration = false;
     this->load_parameters = false;
     this->save_parameters = false;
+}
+
+
+int GUI::getRefineTh()
+{
+    return refine_th;
+}
+
+bool GUI::toRefine()
+{
+    return refine_th > 0;
 }

@@ -78,6 +78,7 @@ StereoCamera::StereoCamera(bool rectify) {
     this->mutex=new Semaphore(1);
     this->rectify=rectify;
     this->epipolarTh=0.01;
+    this->cameraChanged = true;
 
 #if !defined(USING_GPU) && !defined(OPENCV_GREATER_2)
     cv::initModule_nonfree();
@@ -507,7 +508,11 @@ void StereoCamera::rectifyImages()
         cout << "Images are not set! set the images first!" << endl;
         return;
     }
+
     Size img_size = this->imleft.size();
+
+//    std::cout << "!! rectifyImages 1" << std::endl;
+//    std::cout << cameraChanged << std::endl;
 
     if(cameraChanged)
     {
@@ -516,17 +521,27 @@ void StereoCamera::rectifyImages()
         mutex->post();
     }
 
+//    std::cout << "!! rectifyImages 2" << std::endl;
+//    std::cout << cameraChanged << std::endl;
+
     if(cameraChanged)
     {
         initUndistortRectifyMap(this->Kleft, this->DistL, this->RLrect, this->PLrect, img_size, CV_32FC1, this->map11, this->map12);
         initUndistortRectifyMap(this->Kright,  this->DistR, this->RRrect, this->PRrect, img_size, CV_32FC1, this->map21, this->map22);
     }
 
+//    std::cout << this->imleft.size() << std::endl;
+//    std::cout << this->map11.size() << std::endl;
+//    std::cout << this->map12.size() << std::endl;
+//    std::cout << this->imleft.size() << std::endl;
+
 //    Mat img1r, img2r;
     remap(this->imleft, this->imgLeftRect, this->map11, this->map12, cv::INTER_LINEAR);
     remap(this->imright, this->imgRightRect, this->map21,this->map22, cv::INTER_LINEAR);
 //    this->imgLeftRect=img1r;
 //    this->imgRightRect=img2r;
+
+    cameraChanged = false;
 
 }
 
@@ -2697,36 +2712,7 @@ cv::Mat StereoCamera::remapDisparity(cv::Mat disp)
 
     cv::Mat remapped;
 
-    if (cameraChanged)
-    {
-        this->mutex->wait();
-
-        Mat inverseMapL(disp.rows*disp.cols,1,CV_32FC2);
-        Mat inverseMapR(disp.rows*disp.cols,1,CV_32FC2);
-
-        for (int y=0; y<disp.rows; y++)
-        {
-            for (int x=0; x<disp.cols; x++)
-            {
-                inverseMapL.ptr<float>(y*disp.cols+x)[0]=(float)x;
-                inverseMapL.ptr<float>(y*disp.cols+x)[1]=(float)y;
-                inverseMapR.ptr<float>(y*disp.cols+x)[0]=(float)x;
-                inverseMapR.ptr<float>(y*disp.cols+x)[1]=(float)y;
-            }
-        }
-
-        undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
-        undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
-
-        Mat mapperL=inverseMapL.reshape(2,disp.rows);
-        Mat mapperR=inverseMapR.reshape(2,disp.rows);
-        this->MapperL=mapperL;
-        this->MapperR=mapperR;
-
-        this->mutex->post();
-
-        cameraChanged = false;
-    }
+//    this->updateMappings();
 
     Mat x;
     remap(disp,remapped,this->MapperL,x,cv::INTER_LINEAR);
@@ -2739,5 +2725,54 @@ cv::Mat StereoCamera::remapDisparity(cv::Mat disp)
 //        disp.convertTo(disp, CV_16SC1, 16.0);
 
     return remapped;
+
+}
+
+void StereoCamera::updateMappings()
+{
+
+    int rows = this->getImLeft().rows;
+    int cols = this->getImLeft().cols;
+
+//    std::cout << "!! updateMap" << std::endl;
+
+    if (cameraChanged)
+    {
+
+//        std::cout << "!! updateMap IF" << std::endl;
+
+//        std::cout << rows << std::endl;
+//        std::cout << cols  << std::endl;
+
+        this->mutex->wait();
+
+        Mat inverseMapL(rows*cols,1,CV_32FC2);
+        Mat inverseMapR(rows*cols,1,CV_32FC2);
+
+        for (int y=0; y<rows; y++)
+        {
+            for (int x=0; x<cols; x++)
+            {
+                inverseMapL.ptr<float>(y*cols+x)[0]=(float)x;
+                inverseMapL.ptr<float>(y*cols+x)[1]=(float)y;
+                inverseMapR.ptr<float>(y*cols+x)[0]=(float)x;
+                inverseMapR.ptr<float>(y*cols+x)[1]=(float)y;
+            }
+        }
+
+        undistortPoints(inverseMapL,inverseMapL,this->Kleft,this->DistL,this->RLrect,this->PLrect);
+        undistortPoints(inverseMapR,inverseMapR,this->Kright,this->DistR,this->RRrect,this->PRrect);
+
+        Mat mapperL=inverseMapL.reshape(2,rows);
+        Mat mapperR=inverseMapR.reshape(2,rows);
+        this->MapperL=mapperL;
+        this->MapperR=mapperR;
+
+        this->mutex->post();
+
+//        cameraChanged = false;
+    }
+
+//    std::cout << "!! updateMap end" << std::endl;
 
 }

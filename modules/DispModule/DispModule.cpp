@@ -129,6 +129,12 @@ bool DispModule::configure(ResourceFinder & rf)
 //    loadExtrinsics(localCalibration,R0,T0,eyes0);
     loadConfigurationFile(this->localCalibration,R0,T0,eyes0);
 
+    //
+
+    this->original_parameters = this->stereo_parameters;
+
+    //
+
     eyes.resize(eyes0.length(),0.0);
 
     stereo->setIntrinsics(KL,KR,DistL,DistR);
@@ -225,32 +231,34 @@ bool DispModule::configure(ResourceFinder & rf)
     // methods on the basis of the parameters the
     // module has been invoked with
 
-    if (rf.check("sgbm"))
-        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
-    else if(rf.check("sgbm_cuda"))
-        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
-    else if(rf.check("libelas"))
-        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::LIBELAS;
-    else
-        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+    // TODO: scrivere commento e spiegare perche' e' lasciata commentata
 
-    if (rf.check("blf"))
-        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
-    else if(rf.check("blf_cuda"))
-        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
-    else
-        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
+//    if (rf.check("sgbm"))
+//        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
+//    else if(rf.check("sgbm_cuda"))
+//        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_CUDA;
+//    else if(rf.check("libelas"))
+//        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::LIBELAS;
+//    else
+//        this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
 
-    if (rf.check("wls"))
-        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
-    else if(rf.check("wls_lr"))
-        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
-    else
-        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
+//    if (rf.check("blf"))
+//        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_ORIGINAL;
+//    else if(rf.check("blf_cuda"))
+//        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_CUDA;
+//    else
+//        this->stereo_parameters.BLFfiltering = SM_BLF_FILTER::BLF_DISABLED;
+
+//    if (rf.check("wls"))
+//        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_ENABLED;
+//    else if(rf.check("wls_lr"))
+//        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_LRCHECK;
+//    else
+//        this->stereo_parameters.WLSfiltering = SM_WLS_FILTER::WLS_DISABLED;
 
     // initializes the numerical stereo matching parameters
 
-    this->initializeStereoParams();
+//    this->initializeStereoParams();
 
     // if specified via CMake, compile using the GUI
     // based on cvui.h and here checks whether to initialize
@@ -735,8 +743,6 @@ bool DispModule::updateModule()
 
     // gets the (possibly) blf-filtered disparity map
 
-    cv::Mat disp_vis = matcher->getDisparity16("wls");
-
     // TODO: DEBUG, to be removed
 
 //    std::cout << disp_vis.size() << std::endl;
@@ -753,21 +759,38 @@ bool DispModule::updateModule()
     // if the disparity output port is active, sends
     // the current (filtered) one
 
-    if (outDisp.getOutputCount() > 0 && !disp_vis.empty())
+    if (outDisp.getOutputCount() > 0)
     {
-        ImageOf<PixelMono> &outim = outDisp.prepare();
 
-//        std::cout << "Disp Vis Type: " << disp_vis.type() << std::endl;
-//        std::cout << "Disp Vis Size: " << disp_vis.size() << std::endl;
+        // TODO: comment
 
-//        if(this->stereo_parameters.stereo_matching == SM_MATCHING_ALG::SGBM_CUDA)
+        cv::Mat disp_vis = matcher->getDisparity("wls");
+
+        if(!disp_vis.empty())
+        {
+
+            if(gui.toRefine())
+            {
+                orig = disp_vis.clone();
+
+                if(!old_d.empty())
+                    disp_vis = refineDisparity(old_d, disp_vis, gui.getRefineTh());
+
+                old_d = orig.clone();
+            }
+
+            ImageOf<PixelMono> &outim = outDisp.prepare();
+
+    //        std::cout << "Disp Vis Type: " << disp_vis.type() << std::endl;
+    //        std::cout << "Disp Vis Size: " << disp_vis.size() << std::endl;
+
+            //
+
 //            getDisparityVis(disp_vis, disp_vis, 3);
-//        else
-//        if(this->stereo_parameters.stereo_matching == SM_MATCHING_ALG::LIBELAS)
-        getDisparityVis(disp_vis, disp_vis, 3);
 
-        outim = fromCvMat<PixelMono>(disp_vis);
-        outDisp.write();
+            outim = fromCvMat<PixelMono>(disp_vis);
+            outDisp.write();
+        }
     }
 
 //    std::cout << "LOOP - after disp output\n";
@@ -787,6 +810,16 @@ bool DispModule::updateModule()
         }
         else
         {
+
+            if(gui.toRefine())
+            {
+                orig = disp_depth.clone();
+
+                if(!old_de.empty())
+                    disp_depth = refineDisparity(old_de, disp_depth, gui.getRefineTh());
+
+                old_de = orig.clone();
+            }
 
             outputDepth = this->depthFromDisparity(disp_depth, this->stereo->getQ(), this->stereo->getRLrect());
 
@@ -1395,6 +1428,9 @@ bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Ma
     if (Bottle *pXo=extrinsics.find("params").asList())
     {
 
+        std::cout << pXo->get(7).asInt() << std::endl;
+
+
         this->stereo_parameters.minDisparity =        pXo->get(0).asInt();
         this->useBestDisp =                           pXo->get(1).asBool();
         this->stereo_parameters.numberOfDisparities = pXo->get(2).asInt();
@@ -1417,7 +1453,7 @@ bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Ma
 
     }
     else
-        return false;
+        this->initializeStereoParams();
 
     return true;
 }
@@ -2114,5 +2150,19 @@ int main(int argc, char *argv[])
     DispModule mod;
 
     return mod.runModule(rf);
+}
+
+cv::Mat DispModule::refineDisparity(cv::Mat old_disp, cv::Mat new_disp, int th)
+{
+    cv::Mat mask, result;
+
+    cv::absdiff(old_disp, new_disp, mask);
+
+    cv::threshold(mask, mask, th, 1, cv::THRESH_BINARY_INV);
+
+    result = new_disp.mul(mask);
+
+    return result;
+
 }
 

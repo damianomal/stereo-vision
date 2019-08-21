@@ -598,6 +598,12 @@ public:
     */
     cv::Mat remapDisparity(cv::Mat disp);
 
+    /**
+    * XXXXXXXXXXXXXXXXXXXX
+    * @return XXXXXXXXXXXXXXXXXXXX
+    */
+    void updateMappings();
+
 };
 
 #endif // _ICUB_STEREOVISION_STEREOCAMERA_H_

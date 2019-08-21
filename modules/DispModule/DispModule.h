@@ -567,5 +567,9 @@ public:
 
     void printP();
 
+    cv::Mat refineDisparity(cv::Mat old_disp, cv::Mat new_disp, int th);
+    cv::Mat old_d, old_de;
+    cv::Mat orig;
+
 
 };

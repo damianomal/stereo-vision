@@ -21,9 +21,9 @@ enum SM_MATCHING_ALG {
 };
 
 enum SM_BLF_FILTER {
-    BLF_ORIGINAL = 0,
-    BLF_CUDA,
-    BLF_DISABLED
+    BLF_DISABLED = 0,
+    BLF_ORIGINAL,
+    BLF_CUDA
 };
 
 enum SM_WLS_FILTER {

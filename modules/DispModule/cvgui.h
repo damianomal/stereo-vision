@@ -51,6 +51,8 @@ private:
     int stereo_matching_id;
     int num_disparities_id;
 
+    int refine_th;
+
 public:
 
     /**
@@ -192,8 +194,13 @@ public:
     void convertEnumToID();
 
 
+    bool toRefine();
+
+    int getRefineTh();
+
     GUI();
     ~GUI();
+
 
 };
 
