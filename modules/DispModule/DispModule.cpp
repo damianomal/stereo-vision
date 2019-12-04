@@ -768,11 +768,12 @@ bool DispModule::updateModule()
 
         cv::Mat disp_vis = matcher->getDisparity("wls");
 
+#ifdef USE_GUI
         if(!disp_vis.empty())
         {
 
             if(gui.toRefine())
-            {
+           {
                 orig = disp_vis.clone();
 
                 if(!old_d.empty())
@@ -780,6 +781,7 @@ bool DispModule::updateModule()
 
                 old_d = orig.clone();
             }
+#endif
 
             ImageOf<PixelMono> &outim = outDisp.prepare();
 
@@ -813,6 +815,7 @@ bool DispModule::updateModule()
         else
         {
 
+#ifdef USE_GUI
             if(gui.toRefine())
             {
                 orig = disp_depth.clone();
@@ -822,6 +825,7 @@ bool DispModule::updateModule()
 
                 old_de = orig.clone();
             }
+#endif
 
             outputDepth = this->depthFromDisparity(disp_depth, this->stereo->getQ(), this->stereo->getRLrect());
 

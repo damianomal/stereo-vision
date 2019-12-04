@@ -20,6 +20,7 @@ find_package(OpenCV REQUIRED)
 find_package(CUDA REQUIRED)
 
 include_directories(${CUDA_INCLUDE_DIRS})
+include_directories("../../lib/include")
 
 include_directories(${stereoVision_INCLUDE_DIRS})
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sgbm_cuda")
