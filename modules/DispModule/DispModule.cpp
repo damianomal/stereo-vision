@@ -759,6 +759,8 @@ bool DispModule::updateModule()
     // if the disparity output port is active, sends
     // the current (filtered) one
 
+//    std::cout << "Running..." << std::endl;
+
     if (outDisp.getOutputCount() > 0)
     {
 
@@ -1692,7 +1694,8 @@ Point3f DispModule::get3DPoints(int u, int v, const string &drive)
     u=cvRound(usign);
     v=cvRound(vsign);
 
-    const Mat& disp16m=this->stereo->getDisparity16();
+//    const Mat& disp16m=this->stereo->getDisparity16();
+    const Mat& disp16m=this->matcher->getDisparity16("wls");
     if (disp16m.empty() || (u<0) || (u>=disp16m.cols) || (v<0) || (v>=disp16m.rows))
         return point;
 
@@ -1860,6 +1863,7 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         cout << "closing..." << endl;
         return false;
     }
+
 
     if (command.get(0).asString()=="help") {
 //        reply.addVocab(Vocab::encode("many"));
