@@ -36,7 +36,7 @@ The choice to maintain a GUI is due to the non-trivial amount of fine-tuning whi
 
 The components (and the code related to) the GUI can be disabled by means of a toggle in the CMake configuration, named `USE_DISPMODULE_GUI`. Disabling it, takes away the single header file representing the GUI base code, together with all the other bits of source related to it. Thus, compiling the module without the GUI included actually removes everything about it from the final result.
 
-[insert missing GUI sample image here]
+![GUI](gui.png)
 
 The GUI makes it now easier to recalibrate the stereo system, to save the calibration, to load default stereo parameters and to save the current ones. Once it is not useful anymore, it can be quitted, closing it for the rest of the execution.
 
