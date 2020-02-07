@@ -36,7 +36,9 @@ The choice to maintain a GUI is due to the non-trivial amount of fine-tuning whi
 
 The components (and the code related to) the GUI can be disabled by means of a toggle in the CMake configuration, named `USE_DISPMODULE_GUI`. Disabling it, takes away the single header file representing the GUI base code, together with all the other bits of source related to it. Thus, compiling the module without the GUI included actually removes everything about it from the final result.
 
-![GUI](gui.png)
+<p align="center">
+  <img src="gui.png">
+</p>
 
 The GUI makes it now easier to recalibrate the stereo system, to save the calibration, to load default stereo parameters and to save the current ones. Once it is not useful anymore, it can be quitted, closing it for the rest of the execution.
 
@@ -90,7 +92,7 @@ It is possible to add a new stereo matching method by editing the content of jus
 
 3. file `DisparityModule.cpp`:
 
-   - enrich the content of line 203 [TODO: add hyperlink here], with the new algorithm available, adding a new **keyword** to select it at configuration time:
+   - enrich the content of [line 246](https://github.com/damianomal/stereo-vision/blob/01ba763f6220d9bdcea31aaa50fd88538154a455/modules/DispModule/DispModule.cpp#L246), with the new algorithm available, adding a new **keyword** to select it at configuration time:
 
    ```cpp
    if (rf.check("sgbm"))
@@ -114,13 +116,13 @@ The following additional step is optional, and meant to be considered only if yo
 
 1. (optional) file `cvgui.cpp`:
 
-   - add a new checkbox to the radioButtons call at line 119 [TODO add hyperlink here]:
+   - add a new checkbox to the radioButtons call at [line 114](https://github.com/damianomal/stereo-vision/blob/01ba763f6220d9bdcea31aaa50fd88538154a455/modules/DispModule/cvgui.cpp#L114):
 
    ```cpp
    this->updated |= cvuimine::radioButtons(frame, "Stereo Matching Alg.:", {"SGBM", "SGBM_CUDA", "LibElas", "MethodX"}, {20, 90, 190, 260}, 0);
    ```
 
-   **NOTE**: you might want to enlarge the GUI window, since now there are more options in the radio buttons group associated with the choice of the stereo matching algorithm, this can be done by changing line 65 [TODO hyperlink here] of the file:
+   **NOTE**: you might want to enlarge the GUI window, since now there are more options in the radio buttons group associated with the choice of the stereo matching algorithm, this can be done by changing [line 60](https://github.com/damianomal/stereo-vision/blob/01ba763f6220d9bdcea31aaa50fd88538154a455/modules/DispModule/cvgui.cpp#L60) of the file:
 
    ```cpp
    int gui_width = 450;   
