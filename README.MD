@@ -1,4 +1,3 @@
-
 # **Last updates to the DisparityModule**
 
 The following is a list of the last updates to the `DisparityModule` code, which has been refactored a little with respect to its original state under the name of `SFM`. The GUI proposed in the previous iterations has changed, so to avoid additional dependencies to be added to the `stereo-vision` repository.
@@ -19,6 +18,16 @@ Things were moved a little, with the following organization:
 
 ---
 
+## **Handling of the Stereo Parameters**
+
+The stereo parameters were [directly enforced](https://github.com/robotology/stereo-vision/blob/9cbc03ae5d7983bc908d2089abfb5cfae5e55f42/modules/SFM/SFM.cpp#L28) within the code at startup. This choice didn't allow flexibility, for an user which wanted to change the default values had to recompile the whole module.
+
+The stereo parameters are now saved within the configuration file `SFM.ini`, and are loaded and saved at runtime. In case the parameters are not available in the configuration file (as in the case you run this new module on a PC for the first time), the usual default values are loaded.
+
+(in addition, the name of the `SFM.ini` file should be updated to match the new name of the module)
+
+---
+
 ## **GUI**
 
 The former graphical interface based on `imgui` has been replaced by [another one](https://github.com/Dovyski/cvui) which only exploits OpenCV's draw primitives to draw the GUI and to handle the interaction with the user.
@@ -30,6 +39,14 @@ The components (and the code related to) the GUI can be disabled by means of a t
 [insert missing GUI sample image here]
 
 The GUI makes it now easier to recalibrate the stereo system, to save the calibration, to load default stereo parameters and to save the current ones. Once it is not useful anymore, it can be quitted, closing it for the rest of the execution.
+
+---
+
+## **Support connection script**
+
+The code is now shipped with a `connect.sh` bash script, which simply connects the output camCalib ports to the ones used by the `DisparityModule` as input for the left and right images. 
+
+In case the user invokes the `connect.sh` script with an additional parameter `port_name`, the script also connects the disparity output port of the module to the port `port_name`.
 
 ---
 

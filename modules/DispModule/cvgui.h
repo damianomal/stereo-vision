@@ -51,6 +51,7 @@ private:
     int stereo_matching_id;
     int num_disparities_id;
 
+    // threshold for the rough refinement of the disparity map
     int refine_th;
 
 public:
@@ -68,12 +69,7 @@ public:
     void initializeGUI();
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
+    * Initializes the GUI, together with the values for the stereo matching and filtering parameters
     *
     */
     void initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWindowSize,
@@ -90,37 +86,27 @@ public:
     void updateGUI();
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
+    * Gets the internal stereo matching and filtering parameters
     *
     */
-    void getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
-                   int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
-                   int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-                   double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                   SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
-                   SM_MATCHING_ALG& stereo_matching);
+    void getParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                       int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                       int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                       double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
+                       SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
+                       SM_MATCHING_ALG& stereo_matching);
 
 
     /**
-    * XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
-    * @param XXX XXXXXXXXXXXXXXX
+    * Sets the internal stereo matching and filtering parameters
     *
     */
-    void setParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
-                   int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
-                   int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-                   double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-                   SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
-                   SM_MATCHING_ALG& stereo_matching);
+    void setParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                       int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                       int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                       double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
+                       SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
+                       SM_MATCHING_ALG& stereo_matching);
 
 
 
@@ -143,14 +129,6 @@ public:
      *
      */
     void resetState();
-
-    /**
-    * Sets the state of the interface to the one specified
-    * @param v1 XXXXXXXXXXXXXXX
-    * @param v2 XXXXXXXXXXXXXXX
-    *
-    */
-    void setUpdated(bool v1, bool v2);
 
     /**
     * Checks whether the user asked the system to carry out the recalibration process
@@ -181,21 +159,30 @@ public:
     bool toSaveParameters();
 
     /**
-    * XXXXXXXXXXXXXXX
+    * Converts the IDs to the corresponding enumeration values
     *
     */
     void convertIDToEnum();
 
-
     /**
-    * XXXXXXXXXXXXXXX
+    * Converts the enumeration to the corresponding IDs
     *
     */
     void convertEnumToID();
 
-
+    /**
+    * Checks whether the user asked to refine the disparity map
+    * @return True if the disparity map should be refined, False otherwise
+    *
+    */
     bool toRefine();
 
+
+    /**
+    * Gets the threshold used in the refinement of the disparity map
+    * @return the value for the refinement threshold
+    *
+    */
     int getRefineTh();
 
     GUI();

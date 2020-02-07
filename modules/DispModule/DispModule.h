@@ -288,7 +288,6 @@ class DispModule: public yarp::os::RFModule
     Port handlerPort;
 
     // output YARP ports
-
     BufferedPort<ImageOf<PixelFloat> > outDepth;
     BufferedPort<ImageOf<PixelMono> >  outDisp;
 
@@ -297,43 +296,23 @@ class DispModule: public yarp::os::RFModule
     int numberOfTrials;
     string camCalibFile;
 
-    // stereo matching parameters
-
+    // stereo matching and calibration auxiliary parameters
     bool useBestDisp;
-//    int uniquenessRatio;
-//    int speckleWindowSize;
-//    int speckleRange;
-//    int numberOfDisparities;
-//    int SADWindowSize;
-//    int minDisparity;
-//    int preFilterCap;
-//    int disp12MaxDiff;
-    bool doSFM;
+    bool runRecalibration;
     bool calibUpdated;
     bool debugWindow;
-//    double sigmaColorBLF;
-//    double sigmaSpaceBLF;
-//    double wls_lambda;
-//    double wls_sigma;
     bool doBLF;
-    bool useWLSfiltering;
-    bool usePorts;
-    bool left_right;
 
     Params stereo_parameters, original_parameters;
 
     // mutex and other handles needed by the module
-
     yarp::os::Mutex mutexRecalibration;
     Event calibEndEvent;
     yarp::os::Mutex mutexDisp;
 
-    //
-
     ResourceFinder localCalibration;
 
     // objects to interfare with the
-
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
     IGazeControl* igaze;
@@ -342,6 +321,19 @@ class DispModule: public yarp::os::RFModule
     Mat HL_root;
     Mat HR_root;
     Mat R0,T0;
+
+    // objects used in the refinement of the disparity map
+    cv::Mat old_d, old_de;
+    cv::Mat orig;
+
+    bool init;
+
+    // parameters for the CUDA implementation of SGBM
+    SGM_PARAMS cuda_params, params_right;
+
+    // object handling the stereo matching algorithms
+    StereoMatcherNew * matcher;
+
 
     /**
     * Loads the cameras intrinsic matrices
@@ -359,10 +351,9 @@ class DispModule: public yarp::os::RFModule
     /**
     * Loads the cameras intrinsic matrices and the stereo disparity parameters
     * @param rf the ResourceFinder object
-    * @param KL left camera intrinsic parameters matrix
-    * @param KR right camera intrinsic parameters matrix
-    * @param DistL left camera distortion parameters
-    * @param DistR right camera distortion parameters
+    * @param Ro the rotation of the right eye with respect to the left one
+    * @param To the translation of the right eye with respect to the left one
+    * @param eyes the state of the eyes
     * @return True if the loading is successfull, False otherwise
     *
     */
@@ -371,14 +362,13 @@ class DispModule: public yarp::os::RFModule
     /**
     * Loads the cameras intrinsic matrices and the stereo disparity parameters
     * @param rf the ResourceFinder object
-    * @param KL left camera intrinsic parameters matrix
-    * @param KR right camera intrinsic parameters matrix
-    * @param DistL left camera distortion parameters
-    * @param DistR right camera distortion parameters
+    * @param Ro left camera intrinsic parameters matrix
+    * @param To right camera intrinsic parameters matrix
+    * @param eyes left camera distortion parameters
     * @return True if the loading is successfull, False otherwise
     *
     */
-    bool loadStereoParameters(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
+    // bool loadStereoParameters(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes);
 
     /**
     * Builds a 4x4 rototraslation matrix starting from the corresponding rotation matrix and translation vector
@@ -389,12 +379,6 @@ class DispModule: public yarp::os::RFModule
     */
     Mat buildRotTras(const Mat& R, const Mat& T);
 
-    /**
-    * XXXXXXXXXXXXXXX
-    * @param camera XXXXXXXXXXXXXXX
-    * @return XXXXXXXXXXXXXXX
-    *
-    */
     Matrix getCameraHGazeCtrl(int camera);
 
     /**
@@ -492,16 +476,6 @@ class DispModule: public yarp::os::RFModule
     GUI gui;
 #endif
 
-    bool init;
-
-//    SM_BLF_FILTER BLFfiltering;
-//    SM_WLS_FILTER WLSfiltering;
-//    SM_MATCHING_ALG stereo_matching;
-
-    SGM_PARAMS cuda_params, params_right;
-
-    StereoMatcherNew * matcher;
-
 public:
 
     // module methods
@@ -535,22 +509,6 @@ public:
     */
     Point3f get3DPoints(int u, int v, const string &drive="LEFT");
 
-    // TODO: the next method has been removed
-
-//    /**
-//    * ZZZZZZZZZZZZZZZZZZZZZZZZZZ
-//    * @param u XXXXXXXXXXXXXXXXXXXXX
-//    * @param v XXXXXXXXXXXXXXXXXXXXX
-//    * @param uR XXXXXXXXXXXXXXXXXXXXX
-//    * @param vR XXXXXXXXXXXXXXXXXXXXX
-//    * @param drive XXXXXXXXXXXXXXXXXXXXX
-//    * @return XXXXXXXXXXXX
-//    *
-//    */
-//    Point3f get3DPointsAndDisp(int u, int v, int &uR, int &vR, const string &drive);
-
-//    Point3f get3DPointMatch(double u1, double v1, double u2, double v2, const string &drive="LEFT");
-
     /**
     * Projects a 3D point onto one of the two image planes
     * @param camera Camera plane to project the point to, can be "left" or "right"
@@ -565,11 +523,19 @@ public:
     DispModule();
     ~DispModule();
 
-    void printP();
+    /**
+    * Prints the stereo matching parameters to standard output
+    *
+    */
+    void printParameters();
 
+    /**
+    * Rough polishing of the disparity map, cleans away the pixel which values flickered too much w.r.t. the previous frame 
+    * @param old_disp disparity map computed in the previous step
+    * @param new_disp current disparity map
+    * @param th threshold value, the higher the value, the higher the tolerance to the flickering of the disparity map
+    * 
+    */
     cv::Mat refineDisparity(cv::Mat old_disp, cv::Mat new_disp, int th);
-    cv::Mat old_d, old_de;
-    cv::Mat orig;
-
 
 };

@@ -2486,6 +2486,12 @@ void handleMouse(int theEvent, int theX, int theY, int theFlags, void* theData) 
 
 } // namespace cvui
 
+/******************************************************************************/
+
+// customized part of the library, wrapping cvui in "cvuiw" and 
+// implementing a custom "radioButtons()" function to draw and 
+// handle radiobutton-like object, by means of the elements already
+// available in the original cvui.h
 
 const int MAX_RADIO_BUTTONS = 10;
 const int TRACKBAR_WIDTH = 300;
@@ -2551,8 +2557,9 @@ namespace cvuiw {
 
 		int selected = -1;
 
-		// if this radiobutton states have not been initialized
-		// yet, does it
+		// if this radiobutton states have 
+		// not been initialized yet, does it
+
 		if(radio_states.at(cur_radio).states == NULL)
 		{
 

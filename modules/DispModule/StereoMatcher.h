@@ -12,7 +12,9 @@
 
 #include "opencv2/ximgproc/disparity_filter.hpp"
 
-//
+Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
+
+// enums to handle the different stereo matching algorithms available
 
 enum SM_MATCHING_ALG {
     SGBM_OPENCV = 0,
@@ -20,11 +22,15 @@ enum SM_MATCHING_ALG {
     LIBELAS
 };
 
+// enums to handle the different bilateral filtering methods
+
 enum SM_BLF_FILTER {
     BLF_DISABLED = 0,
     BLF_ORIGINAL,
     BLF_CUDA
 };
+
+// enums to handle the activation of the WLS filtering
 
 enum SM_WLS_FILTER {
     WLS_DISABLED = 0,
@@ -32,7 +38,8 @@ enum SM_WLS_FILTER {
     WLS_LRCHECK
 };
 
-//
+// struct containing the parameters for the  
+// stereo matching and filtering algorithms
 
 typedef struct {
 
@@ -56,7 +63,7 @@ typedef struct {
 
 } Params;
 
-//
+// 
 
 typedef struct {
 
@@ -75,6 +82,8 @@ typedef struct {
 class StereoMatcherNew {
 
 private:
+
+    // pointer to the StereoCamera object used
 
     StereoCamera * stereo;
 
@@ -105,7 +114,7 @@ private:
     bool disp_wls_available, disp_blf_available;
     Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
 
-    //
+    // fields used for the SGBM implementation in CUDA
 
     cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
     Ptr<cuda::DisparityBilateralFilter> pCudaBilFilter;
@@ -113,24 +122,10 @@ private:
 
     // stereo matching parameters
 
+    Params stereo_parameters;
     bool useBestDisp;
 
-//    int uniquenessRatio;
-//    int speckleWindowSize;
-//    int speckleRange;
-//    int numberOfDisparities;
-//    int SADWindowSize;
-//    int minDisparity;
-//    int preFilterCap;
-//    int disp12MaxDiff;
-//    double sigmaColorBLF;
-//    double sigmaSpaceBLF;
-//    double wls_lambda;
-//    double wls_sigma;
-
-    Params stereo_parameters;
-
-    // different matching algorithms
+    // different matching algorithms available
 
     void matchSGBM();
     void matchLIBELAS();
@@ -156,7 +151,10 @@ public:
     void initCUDAbilateralFilter();
 
 
-
+    /**
+    * Sets the stereo matching and filtering parameters
+    *
+    */
     void setParameters(int minDisparity, int numberOfDisparities, int SADWindowSize,
                        int disp12MaxDiff, int preFilterCap, int uniquenessRatio,
                        int speckleWindowSize, int speckleRange, double sigmaColorBLF,

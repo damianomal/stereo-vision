@@ -26,9 +26,6 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
                        SM_BLF_FILTER &BLFfiltering, SM_WLS_FILTER &WLSfiltering,
                        SM_MATCHING_ALG &stereo_matching)
 {
-
-//    std::cout << "GUI - initializeGUI\n";
-
     this->params.minDisparity = minDisparity;
     this->params.numberOfDisparities = numberOfDisparities;
     this->params.SADWindowSize = SADWindowSize;
@@ -45,8 +42,6 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
     this->params.WLSfiltering = WLSfiltering;
     this->params.stereo_matching = stereo_matching;
 
-//    std::cout << "GUI - initializeGUI end\n";
-
     this->refine_th = 0;
 
     this->convertEnumToID();
@@ -56,7 +51,6 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
 /******************************************************************************/
 void GUI::initializeGUI()
 {
-
     // initializes the GUI internal states
 
     this->resetState();
@@ -67,7 +61,6 @@ void GUI::initializeGUI()
 
     frame = cv::Mat(cv::Size(gui_width, cvuiw::estimateHeight(12,4,2)), CV_8UC3);
     cvui::init(WINDOW_NAME, 3);
-
 }
 
 /******************************************************************************/
@@ -79,8 +72,8 @@ void GUI::killGUI()
 /******************************************************************************/
 void GUI::updateGUI()
 {
-
-//    std::cout << "GUI UPDATE - top\n";
+    // if the window has been closed by the user, 
+    // terminate the execution of the GUI
 
     if(cv::getWindowProperty(WINDOW_NAME, 0) < 0)
     {
@@ -88,12 +81,11 @@ void GUI::updateGUI()
         return;
     }
 
-//    std::cout << "GUI UPDATE - top 2\n";
-//    std::cout << this->params.sigmaColorBLF << std::endl;
+    // set the background color for the GUI frame
 
     frame = cv::Scalar(20, 22, 23);
 
-    // 0. Resets the local state of the GUI
+    // reset the local state of the GUI
 
     cvuiw::reset();
 
@@ -133,8 +125,6 @@ void GUI::updateGUI()
     this->save_calibration = cvuiw::button(frame, "&Save Calibration", 130, 0);
     this->updated |= this->save_calibration;
 
-//    std::cout << "GUI UPDATE - before buttons\n";
-
     // 5. Button to close the GUI
 
     if(cvuiw::button(frame, "&Quit", 282, 0))
@@ -154,28 +144,26 @@ void GUI::updateGUI()
     this->save_parameters = cvuiw::button(frame, "Save &Parameters", 155, 1);
     this->updated |= this->save_parameters;
 
-    // acquire the selected radiobuttons indexes..
+    // 8. Acquire the selected radiobuttons indexes..
 
     this->num_disparities_id = cvuiw::getRadioIndex(0);
     this->stereo_matching_id = cvuiw::getRadioIndex(1);
     this->BLFfiltering_id = cvuiw::getRadioIndex(2);
     this->WLSfiltering_id = cvuiw::getRadioIndex(3);
 
-    // .. then converts it to the corresponding ENUM elements
+    // 9. ..then convert it to the corresponding ENUM elements
 
     this->convertIDToEnum();
 
     // Since cvui::init() received a param regarding waitKey,
     // there is no need to call cv::waitKey() anymore. cvui::update()
     // will do it automatically.
-    cvui::update();
 
-//    std::cout << "GUI UPDATE - before imshow\n";
+    cvui::update();
 
     cv::imshow(WINDOW_NAME, frame);
 
     return;
-
 }
 
 /******************************************************************************/
@@ -221,7 +209,6 @@ void GUI::convertIDToEnum()
     }
 
     this->params.numberOfDisparities = 32 * (this->num_disparities_id+1);
-
 }
 
 /******************************************************************************/
@@ -270,17 +257,16 @@ void GUI::convertEnumToID()
     }
 
     this->num_disparities_id = (this->params.numberOfDisparities/32)-1;
-
 }
 
-void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
-               int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
-               int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
-               double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
-               SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
-               SM_MATCHING_ALG& stereo_matching)
+/******************************************************************************/
+void GUI::getParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+                        int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
+                        int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
+                        double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
+                        SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
+                        SM_MATCHING_ALG& stereo_matching)
 {
-
     minDisparity = this->params.minDisparity;
     numberOfDisparities = this->params.numberOfDisparities;
     SADWindowSize = this->params.SADWindowSize;
@@ -298,14 +284,14 @@ void GUI::getParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     stereo_matching = this->params.stereo_matching;
 }
 
-void GUI::setParams(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
+/******************************************************************************/
+void GUI::setParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
                double& sigmaSpaceBLF, double& wls_lambda, double& wls_sigma,
                SM_BLF_FILTER& BLFfiltering, SM_WLS_FILTER& WLSfiltering,
                SM_MATCHING_ALG& stereo_matching)
 {
-
     this->params.minDisparity = minDisparity;
     this->params.numberOfDisparities = numberOfDisparities;
     this->params.SADWindowSize = SADWindowSize;
@@ -322,8 +308,6 @@ void GUI::setParams(int& minDisparity, int& numberOfDisparities, int& SADWindowS
     this->params.WLSfiltering = WLSfiltering;
     this->params.stereo_matching = stereo_matching;
 }
-
-
 
 /******************************************************************************/
 bool GUI::isDone()
@@ -372,12 +356,13 @@ void GUI::resetState()
     this->save_parameters = false;
 }
 
-
+/******************************************************************************/
 int GUI::getRefineTh()
 {
     return refine_th;
 }
 
+/******************************************************************************/
 bool GUI::toRefine()
 {
     return refine_th > 0;

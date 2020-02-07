@@ -19,4 +19,5 @@ set(USE_DISPMODULE FALSE CACHE BOOL "Select false not to compile DispModule")
 if(USE_DISPMODULE)
     add_subdirectory(DispModule)
 endif()
-add_subdirectory(pointCloudConversion)
+
+#add_subdirectory(pointCloudConversion)

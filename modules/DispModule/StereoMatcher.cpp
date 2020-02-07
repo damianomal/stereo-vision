@@ -8,8 +8,6 @@ using cv::Ptr;
 using cv::StereoSGBM;
 using namespace cv::ximgproc;
 
-Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
-
 /******************************************************************************/
 Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
 {
@@ -29,9 +27,6 @@ Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance)
 
     return r;
 }
-
-
-
 
 /******************************************************************************/
 void StereoMatcherNew::setParameters(int minDisparity, int numberOfDisparities, int SADWindowSize,
@@ -56,23 +51,13 @@ void StereoMatcherNew::setParameters(int minDisparity, int numberOfDisparities, 
     this->stereo_parameters.BLFfiltering = BLFfiltering;
     this->stereo_parameters.WLSfiltering = WLSfiltering;
     this->stereo_parameters.stereo_matching = stereo_matching;
-
-//    std::cout << "AAAA " << this->speckleRange << std::endl;
 }
-
-
 
 /******************************************************************************/
 void StereoMatcherNew::compute()
 {
-
-//    std::cout << "SM: rectify\n";
-
     this->stereo->updateMappings();
     this->stereo->rectifyImages();
-
-//    std::cout << "SM: match\n";
-
 
     switch(this->stereo_parameters.stereo_matching)
     {
@@ -92,32 +77,17 @@ void StereoMatcherNew::compute()
 void StereoMatcherNew::filterBLF(string kind = "base")
 {
 
-    // TODO finire di scrivere]
-
-//    std::cout << "SM: getDisparity\n";
-
     cv::Mat input = this->getDisparity(kind);
     cv::Mat input16 = this->getDisparity16(kind);
-
-//    std::cout << "SM: switch\n";
 
     switch(this->stereo_parameters.BLFfiltering)
     {
         case SM_BLF_FILTER::BLF_ORIGINAL:
 
-//            cv_extend::bilateralFilter(input,
-//                                       this->disparity_blf,
-//                                       this->stereo_parameters.sigmaColorBLF,
-//                                       this->stereo_parameters.sigmaSpaceBLF);
-
-//            input16 /= 16.;
-
             cv_extend::bilateralFilter(input16,
                                        this->disparity16_blf,
                                        this->stereo_parameters.sigmaColorBLF,
                                        this->stereo_parameters.sigmaSpaceBLF);
-
-//            input16 *= 16.;
 
             getDisparityVis(this->disparity16_blf, this->disparity_blf, 3);
 
@@ -127,13 +97,6 @@ void StereoMatcherNew::filterBLF(string kind = "base")
         {
             cv::Mat grayL = this->stereo->getLRectified();
             cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-
-//            imageGpu.upload(grayL);
-//            gpuDisp.upload(input);
-
-//            pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
-
-//            filtGpu.download(this->disparity_blf);
 
             imageGpu.upload(grayL);
             gpuDisp.upload(input16);
@@ -153,14 +116,11 @@ void StereoMatcherNew::filterBLF(string kind = "base")
             this->disparity16_blf = input16.clone();
             break;
     }
-
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::filterWLS(string kind = "base")
 {
-
     cv::Mat input = this->getDisparity(kind);
     cv::Mat input16 = this->getDisparity16(kind);
     cv::Rect ROI;
@@ -186,8 +146,6 @@ void StereoMatcherNew::filterWLS(string kind = "base")
         {
             case SM_WLS_FILTER::WLS_ENABLED:
 
-//                std::cout << "WLS_ENABLED" << std::endl;
-
                 wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
 
                 wls_filter->setLambda(this->stereo_parameters.wls_lambda);
@@ -197,14 +155,10 @@ void StereoMatcherNew::filterWLS(string kind = "base")
 
                 wls_filter->filter(input,left_rect,this->disparity_wls,Mat(),ROI);
                 wls_filter->filter(input16,left_rect,this->disparity16_wls,Mat(),ROI);
-//                this->disparity_wls.convertTo(this->disparity16_wls, CV_16SC1, 16.0);
-
 
                 break;
 
             case SM_WLS_FILTER::WLS_LRCHECK:                    
-
-//                std::cout << "WLS_LRCHECK" << std::endl;
 
                 if(this->stereo_matching == SM_MATCHING_ALG::SGBM_OPENCV)
                 {
@@ -213,10 +167,6 @@ void StereoMatcherNew::filterWLS(string kind = "base")
 
                     wls_filter->setLambda(this->stereo_parameters.wls_lambda);
                     wls_filter->setSigmaColor(this->stereo_parameters.wls_sigma);
-//                    wls_filter->setDepthDiscontinuityRadius((int)ceil(0.5*this->stereo_parameters.SADWindowSize));
-//                    cv::Rect ROI = computeROI2(left_rect.size(),sgbm);
-
-//                    wls_filter->filter(input,left_rect,this->disparity_wls,Mat(),ROI);
 
                     cv::Mat right_disp;
 
@@ -225,8 +175,7 @@ void StereoMatcherNew::filterWLS(string kind = "base")
                     right_matcher->compute(this->stereo->getRRectified(),this->stereo->getLRectified(), right_disp);
 
                     wls_filter->filter(input,left_rect,this->disparity_wls,right_disp);
-//                    wls_filter->filter(input16,left_rect,this->disparity16_wls,right_disp);
-
+                    wls_filter->filter(input16,left_rect,this->disparity16_wls,right_disp);
 
                 }
                 else
@@ -245,68 +194,13 @@ void StereoMatcherNew::filterWLS(string kind = "base")
         this->disparity_wls = input.clone();
         this->disparity16_wls = input16.clone();
     }
-
-//    std::cout << "FilterWLS - End\n";
-
 }
-
-//void StereoMatcher::filter()
-//{
-
-//    cv::Mat disp, disp_blf;
-
-//    disp = this->disparity();
-
-
-//    if(this->blf_filtering != SM_BLF_FILTER::BLF_DISABLED)
-//        this->filterBLF();
-
-//    if(this->wls_filtering != SM_WLS_FILTER::WLS_DISABLED)
-//        this->filterWLS();
-
-//    switch(this->blf_filtering)
-//    {
-//        case SM_BLF_FILTER::BLF_ORIGINAL:
-
-//            cv_extend::bilateralFilter(disp, disp_blf, this->sigmaColorBLF, this->sigmaSpaceBLF);
-//            break;
-
-//        case SM_BLF_FILTER::BLF_CUDA:
-
-//            cv::Mat grayL = this->stereo->getLRectified();
-//            cv::cvtColor(grayL, grayL, CV_BGR2GRAY);
-
-//            cv::cuda::GpuMat imageGpu, gpuDisp, filtGpu;
-
-//            imageGpu.upload(grayL);
-//            gpuDisp.upload(disp);
-
-//            pCudaBilFilter->apply(gpuDisp, imageGpu, filtGpu);
-
-//            filtGpu.download(disp_blf);
-
-//            break;
-
-//        case SM_BLF_FILTER::BLF_DISABLED:
-//        default:
-
-//            disp_blf = disp;
-//            break;
-//    }
-
-//    this->setDisparity(disp_blf, "BLF");
-
-
-
-//}
 
 /******************************************************************************/
 cv::Mat StereoMatcherNew::getDisparity(string kind="base")
 {
-//    for (auto & c: kind)
-//        c = toupper(c);
-
-//    std::cout << "SM: getDisparity inside\n";
+    // return the disparity map specified 
+    // via the "kind" parameter
 
     if(kind == "base")
         return this->disparity;
@@ -319,16 +213,14 @@ cv::Mat StereoMatcherNew::getDisparity(string kind="base")
         std::cout << "!! Disparity kind " << kind <<  " not found, returning BASE disparity." << std::endl;
         return this->disparity;
     }
-
-//    std::cout << "SM: getDisparity should not be here\n";
 }
 
 
 /******************************************************************************/
 cv::Mat StereoMatcherNew::getDisparity16(string kind="base")
 {
-//    for (auto & c: kind)
-//        c = toupper(c);
+    // return the disparity map specified 
+    // via the "kind" parameter
 
     if(kind == "base")
         return this->disparity16;
@@ -343,14 +235,9 @@ cv::Mat StereoMatcherNew::getDisparity16(string kind="base")
     }
 }
 
-
 /******************************************************************************/
 void StereoMatcherNew::setAlgorithm(string name)
 {
-
-//    for (auto & c: name)
-//        c = toupper(c);
-
     if(name == "sgbm")
         this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     else if(name == "sgbm_cuda")
@@ -362,81 +249,24 @@ void StereoMatcherNew::setAlgorithm(string name)
         std::cout << "!! Stereo Matching algorithm " << name <<  " not found, defaulting to SGBM." << std::endl;
         this->stereo_parameters.stereo_matching = SM_MATCHING_ALG::SGBM_OPENCV;
     }
-
 }
-
-//void StereoMatcher::setDisparity(cv::Mat disp)
-//{
-
-//    switch(this->algorithm)
-//    {
-//        case SM_MATCHING_ALG::SGBM_OPENCV:
-//            this->disp_sgbm.disp = disp;
-//            break;
-//        case SM_MATCHING_ALG::SGBM_CUDA:
-//            this->disp_cuda.disp = disp;
-//            break;
-//        case SM_MATCHING_ALG::LIBELAS:
-//            this->disp_libelas.disp = disp;
-//            break;
-//    }
-
-//}
-
-
-//void StereoMatcherNew::setDisparity(cv::Mat disp, string kind="BASE")
-//{
-
-//    for (auto & c: kind)
-//        c = toupper(c);
-
-//    if(kind == "BASE")
-//        this->disparity = disp;
-//    else if(kind == "BLF")
-//        this->disparity_blf = disp;
-//    else if(kind == "WLS")
-//        this->disparity_wls = disp;
-//    else
-//    {
-//        std::cout << "!! Disparity16 kind " << kind <<  " not found, returning BASE disparity." << std::endl;
-//        this->disparity = disp;
-//    }
-
-//}
-
-//cv::Mat StereoMatcher::getDisparity()
-//{
-//    cv::Mat disp;
-
-//    switch(this->algorithm)
-//    {
-//        case SM_MATCHING_ALG::SGBM_OPENCV:
-//            return NULL;
-//            break;
-//        case SM_MATCHING_ALG::SGBM_CUDA:
-//            getDisparityVis(this->disp_cuda.disp, disp, 2);
-//            return disp;
-//            break;
-//        case SM_MATCHING_ALG::LIBELAS:
-//        return NULL;
-//            break;
-//    }
-//}
 
 /******************************************************************************/
 StereoMatcherNew::StereoMatcherNew(yarp::os::ResourceFinder &rf, StereoCamera * stereo)
 {
-
     this->stereo = stereo;
     this->wls_filter = cv::ximgproc::createDisparityWLSFilterGeneric(false);
     this->initELAS(rf);
     this->initCUDAbilateralFilter();
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::updateCUDAParams()
 {
+    // updates the parameters for the CUDA matching algorithm
+    // in the corresponding struct, together to those related 
+    // to the CUDA bilateral filter
+
     this->cuda_params.preFilterCap = this->stereo_parameters.preFilterCap;
     this->cuda_params.BlockSize = this->stereo_parameters.SADWindowSize;
     this->cuda_params.P1 = 8 * this->cuda_params.BlockSize * this->cuda_params.BlockSize;
@@ -449,23 +279,25 @@ void StereoMatcherNew::updateCUDAParams()
 
     pCudaBilFilter->setSigmaRange(this->stereo_parameters.sigmaColorBLF);
     pCudaBilFilter->setNumDisparities(this->stereo_parameters.numberOfDisparities);
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::initCUDAbilateralFilter()
 {
+    // initializes the values for the CUDA bilateral filtering
+
     int radius = 7;
     int iters = 2;
 
     this->pCudaBilFilter = cuda::createDisparityBilateralFilter(this->stereo_parameters.numberOfDisparities, radius, iters);
     this->pCudaBilFilter->setSigmaRange(this->stereo_parameters.sigmaColorBLF);
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::initELAS(yarp::os::ResourceFinder &rf)
 {
+    // initializes the parameters for the stereo 
+    // matching algorithm implemented in libElas
 
     string elas_string = rf.check("elas_setting",Value("ROBOTICS")).asString();
 
@@ -530,6 +362,7 @@ void StereoMatcherNew::initELAS(yarp::os::ResourceFinder &rf)
 /******************************************************************************/
 void StereoMatcherNew::matchLIBELAS()
 {
+    // runs the computation of the disparity map using the libElas wrapper
 
     cv::Mat map;
 
@@ -540,14 +373,14 @@ void StereoMatcherNew::matchLIBELAS()
 
     this->disparity.convertTo(this->disparity16, CV_16SC1, 16.0);
 
-//    this->disparity = this->stereo->remapDisparity(map);
     getDisparityVis(this->disparity16, this->disparity, 3);
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::matchSGBM()
 {
+    // computes the disparity map using the implementation 
+    // of SGBM available in OpenCV
 
     cv::Mat map, disp;
 
@@ -568,21 +401,15 @@ void StereoMatcherNew::matchSGBM()
 
     this->disparity16 = disp;
 
-//    disp.convertTo(map, CV_32FC1, 1.0,0.0);
-//    map.convertTo(map,CV_32FC1,255/(this->stereo_parameters.numberOfDisparities*16.));
-//    this->disparity = this->stereo->remapDisparity(map);
-
     getDisparityVis(disp, this->disparity, 3);
-
 }
 
 /******************************************************************************/
 void StereoMatcherNew::matchSGBMCUDA()
 {
+    // runs the SGBM stereo matching algorithm implemented in CUDA
 
     cv::Mat outputDm;
-
-//    this->stereo->rectifyImages();
 
     cv::Mat grayL = this->stereo->getLRectified();
     cv::Mat grayR = this->stereo->getRRectified();
@@ -594,8 +421,6 @@ void StereoMatcherNew::matchSGBMCUDA()
 
     cv::Mat map;
     outputDm.convertTo(map,CV_32FC1,255/(this->stereo_parameters.numberOfDisparities*16.));
-
-//    this->disparity = this->stereo->remapDisparity(map);
 
     getDisparityVis(outputDm, this->disparity, 3);
 
