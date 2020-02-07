@@ -199,7 +199,7 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else
     {
-        cout<<"[DisparityModule] Devices not available"<<endl;
+        std::cout << "[DisparityModule] Devices not available" << std::endl;
         return false;
     }
 
@@ -213,7 +213,7 @@ bool DispModule::configure(ResourceFinder & rf)
         gazeCtrl.view(igaze);
     else
     {
-        cout<<"[DisparityModule] Devices not available"<<endl;
+        std::cout << "[DisparityModule] Devices not available" << std::endl;
         headCtrl.close();
         return false;
     }
@@ -227,8 +227,8 @@ bool DispModule::configure(ResourceFinder & rf)
     }
     else
     {
-        cout << "[DisparityModule] No local calibration file found in " <<  camCalibFile
-             << "[DisparityModule] ... Using Kinematics and Running SFM once." << endl;
+        std::cout << "[DisparityModule] No local calibration file found in " <<  camCalibFile
+             << "[DisparityModule] ... Using Kinematics and Running SFM once." << std::endl;
         updateViaGazeCtrl(true);
         R0=this->stereo->getRotation();
         T0=this->stereo->getTranslation();
@@ -505,6 +505,7 @@ void DispModule::recalibrate()
         mutexDisp.lock();
         stereo->findMatch(false);
 #endif
+
         stereo->estimateEssential();
         bool ok=stereo->essentialDecomposition();
         mutexDisp.unlock();
@@ -706,12 +707,12 @@ bool DispModule::updateModule()
 
     mutexRecalibration.unlock();
 
-    mutexDisp.lock();
-
     // compute the current disparity map
 
-    matcher->compute();
+    mutexDisp.lock();
 
+    matcher->compute();
+    
     mutexDisp.unlock();
 
     // execute the bilateral filtering of the
@@ -831,7 +832,7 @@ bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, 
             eyes[i]=bEyes->get(i).asDouble();
     }
 
-    cout<<"[DisparityModule] Read Eyes Configuration = ("<<eyes.toString(3,3)<<")"<<endl;
+    std::cout << "[DisparityModule] Read Eyes Configuration = ("<<eyes.toString(3,3)<<")" << std::endl;
 
     if (Bottle *pXo=extrinsics.find("HN").asList())
     {
@@ -867,8 +868,8 @@ bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Ma
             eyes[i] = bEyes->get(i).asDouble();
     }
 
-    cout << "[DisparityModule] Read Eyes Configuration = ("
-         << eyes.toString(3,3) << ")" << endl;
+    std::cout << "[DisparityModule] Read Eyes Configuration = ("
+         << eyes.toString(3,3) << ")" << std::endl;
 
     // loads the calibration matrix associated with the
     // stereo system
@@ -892,9 +893,6 @@ bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Ma
 
     if (Bottle *pXo=extrinsics.find("params").asList())
     {
-
-        std::cout << pXo->get(7).asInt() << std::endl;
-
 
         this->stereo_parameters.minDisparity =        pXo->get(0).asInt();
         this->useBestDisp =                           pXo->get(1).asBool();
@@ -1048,7 +1046,8 @@ bool DispModule::updateConfigurationFile(Mat& Rot, Mat& Tr, yarp::sig::Vector& e
             << 0.0 << " " << 0.0 << " " << 0.0 << " " << 1.0                << ")"
             << endl;
 
-        // TODO: change the following code and insert the stereo oparameters struct
+        // TODO: change the following code and insert the stereo 
+        // parameters in the corresponding struct as defined in StereoMatcher.h
 
         out << "params ("
             << this->stereo_parameters.minDisparity << " "
@@ -1118,7 +1117,6 @@ Point3f DispModule::get3DPoints(int u, int v, const string &drive)
     u=cvRound(usign);
     v=cvRound(vsign);
 
-//    const Mat& disp16m=this->stereo->getDisparity16();
     const Mat& disp16m=this->matcher->getDisparity16("wls");
     if (disp16m.empty() || (u<0) || (u>=disp16m.cols) || (v<0) || (v>=disp16m.rows))
         return point;
@@ -1284,7 +1282,7 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
         return false;
 
     if (command.get(0).asString()=="quit") {
-        cout << "[DisparityModule] Closing..." << endl;
+        std::cout << "[DisparityModule] Closing..." << std::endl;
         return false;
     }
 
