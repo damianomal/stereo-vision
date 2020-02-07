@@ -340,29 +340,34 @@ void StereoMatcherNew::initELAS(yarp::os::ResourceFinder &rf)
     if (rf.check("elas_filter_adaptive_mean"))
         elaswrap->set_filter_adaptive_mean(rf.find("elas_filter_adaptive_mean").asBool());
 
-    cout << endl << "ELAS parameters:" << endl << endl;
 
-    cout << "disp_scaling_factor: " << disp_scaling_factor << endl;
+    // the following code to print the libElas parameters has
+    // been commented, still is left here in case it's needed
+    // in the future 
 
-    cout << "setting: " << elas_string << endl;
+    // cout << endl << "ELAS parameters:" << endl << endl;
 
-    cout << "postprocess_only_left: " << elaswrap->get_postprocess_only_left() << endl;
-    cout << "subsampling: " << elaswrap->get_subsampling() << endl;
+    // cout << "disp_scaling_factor: " << disp_scaling_factor << endl;
 
-    cout << "add_corners: " << elaswrap->get_add_corners() << endl;
+    // cout << "setting: " << elas_string << endl;
 
-    cout << "ipol_gap_width: " << elaswrap->get_ipol_gap_width() << endl;
+    // cout << "postprocess_only_left: " << elaswrap->get_postprocess_only_left() << endl;
+    // cout << "subsampling: " << elaswrap->get_subsampling() << endl;
 
-    cout << "support_threshold: " << elaswrap->get_support_threshold() << endl;
-    cout << "gamma: " << elaswrap->get_gamma() << endl;
-    cout << "sradius: " << elaswrap->get_sradius() << endl;
+    // cout << "add_corners: " << elaswrap->get_add_corners() << endl;
 
-    cout << "match_texture: " << elaswrap->get_match_texture() << endl;
+    // cout << "ipol_gap_width: " << elaswrap->get_ipol_gap_width() << endl;
 
-    cout << "filter_median: " << elaswrap->get_filter_median() << endl;
-    cout << "filter_adaptive_mean: " << elaswrap->get_filter_adaptive_mean() << endl;
+    // cout << "support_threshold: " << elaswrap->get_support_threshold() << endl;
+    // cout << "gamma: " << elaswrap->get_gamma() << endl;
+    // cout << "sradius: " << elaswrap->get_sradius() << endl;
 
-    cout << endl;
+    // cout << "match_texture: " << elaswrap->get_match_texture() << endl;
+
+    // cout << "filter_median: " << elaswrap->get_filter_median() << endl;
+    // cout << "filter_adaptive_mean: " << elaswrap->get_filter_adaptive_mean() << endl;
+
+    // cout << endl;
 }
 
 

@@ -159,6 +159,7 @@ A few things are not complete (however, they don't compromise the functionality 
 
    1. the correction of the implementation of the left-right consistency for the WLS filtering
    2. saving and loading the disparity map refinement threshold from the configuration file
+   3. the original bilateral filtering is not working as supposed to, since when the code has been moved on the iCub PC, the filtering is run but it looks like that the sigmaColor and sigmaSpace parameters are ignored. This is not critical at all, since that filtering process is very slow, and it can be substituted with the CUDA implementation of the bilateral filtering, which is now available
 
 ---
 # OLD README.MD SECTION
