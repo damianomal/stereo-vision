@@ -70,7 +70,7 @@
 
 using namespace yarp::cv;
 
-/******************************************************************************/
+
 void DispModule::printParameters()
 {
     std::cout << "params ("
@@ -94,7 +94,7 @@ void DispModule::printParameters()
 }
 
 
-/******************************************************************************/
+
 bool DispModule::configure(ResourceFinder & rf)
 {
     // populate local variables with infos from the context
@@ -316,14 +316,19 @@ bool DispModule::configure(ResourceFinder & rf)
     return true;
 }
 
-/******************************************************************************/
+
 cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
 {
+    // compute the depth from the disparity map
+
     cv::Mat depth;
 
     depth = disparity.clone();
 
     depth.convertTo(depth, CV_32FC1, 1./16.);
+
+    // extract the subelements of the R and Q matrices, 
+    // to simplify the further calculations
 
     float r02 = float(R.at<double>(0,2));
     float r12 = float(R.at<double>(1,2));
@@ -360,7 +365,7 @@ cv::Mat DispModule::depthFromDisparity(Mat disparity, Mat Q, Mat R)
     return depth;
 }
 
-/******************************************************************************/
+
 void DispModule::initializeStereoParams()
 {
     this->useBestDisp=true;
@@ -384,7 +389,7 @@ void DispModule::initializeStereoParams()
     this->original_parameters = this->stereo_parameters;
 }
 
-/******************************************************************************/
+
 void DispModule::updateViaKinematics(const yarp::sig::Vector& deyes)
 {
     double dpan=CTRL_DEG2RAD*deyes[1];
@@ -419,7 +424,7 @@ void DispModule::updateViaKinematics(const yarp::sig::Vector& deyes)
 }
 
 
-/******************************************************************************/
+
 void DispModule::updateViaGazeCtrl(const bool update)
 {
     Matrix L1=getCameraHGazeCtrl(LEFT);
@@ -447,7 +452,7 @@ void DispModule::updateViaGazeCtrl(const bool update)
 }
 
 
-/******************************************************************************/
+
 bool DispModule::interruptModule()
 {
     leftImgPort.interrupt();
@@ -460,7 +465,7 @@ bool DispModule::interruptModule()
 }
 
 
-/******************************************************************************/
+
 bool DispModule::close()
 {
     leftImgPort.close();
@@ -485,7 +490,7 @@ bool DispModule::close()
     return true;
 }
 
-/******************************************************************************/
+
 void DispModule::recalibrate()
 {
 
@@ -537,7 +542,7 @@ void DispModule::recalibrate()
         }
 }
 
-/******************************************************************************/
+
 #ifdef USE_GUI
 void DispModule::handleGuiUpdate()
 {
@@ -650,7 +655,7 @@ void DispModule::handleGuiUpdate()
 }
 #endif
 
-/******************************************************************************/
+
 bool DispModule::updateModule()
 {
     // acquire the left and right images
@@ -805,7 +810,7 @@ bool DispModule::updateModule()
     return true;
 }
 
-/******************************************************************************/
+
 double DispModule::getPeriod()
 {
     // the updateModule() method gets synchronized
@@ -813,7 +818,7 @@ double DispModule::getPeriod()
     return 0.0;
 }
 
-/******************************************************************************/
+
 bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes)
 {
     Bottle extrinsics=rf.findGroup("STEREO_DISPARITY");
@@ -846,7 +851,7 @@ bool DispModule::loadExtrinsics(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, 
     return true;
 }
 
-/******************************************************************************/
+
 bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Mat& To, yarp::sig::Vector& eyes)
 {
 
@@ -918,7 +923,7 @@ bool DispModule::loadConfigurationFile(yarp::os::ResourceFinder& rf, Mat& Ro, Ma
     return true;
 }
 
-/******************************************************************************/
+
 bool DispModule::loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, Mat &DistL,
         Mat &DistR)
 {
@@ -982,7 +987,7 @@ bool DispModule::loadIntrinsics(yarp::os::ResourceFinder &rf, Mat &KL, Mat &KR, 
 }
 
 
-/******************************************************************************/
+
 bool DispModule::updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
         const string& groupname)
 {
@@ -1016,7 +1021,7 @@ bool DispModule::updateExtrinsics(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
         return false;
 }
 
-/******************************************************************************/
+
 bool DispModule::updateConfigurationFile(Mat& Rot, Mat& Tr, yarp::sig::Vector& eyes,
         const string& groupname)
 {
@@ -1071,7 +1076,7 @@ bool DispModule::updateConfigurationFile(Mat& Rot, Mat& Tr, yarp::sig::Vector& e
         return false;
 }
 
-/******************************************************************************/
+
 void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
         int _speckleWindowSize,int _speckleRange,
         int _numberOfDisparities, int _SADWindowSize,
@@ -1093,7 +1098,7 @@ void DispModule::setDispParameters(bool _useBestDisp, int _uniquenessRatio,
 
 }
 
-/******************************************************************************/
+
 Point3f DispModule::get3DPoints(int u, int v, const string &drive)
 {
     Point3f point(0.0f,0.0f,0.0f);
@@ -1191,7 +1196,7 @@ Point3f DispModule::get3DPoints(int u, int v, const string &drive)
     return point;
 }
 
-/******************************************************************************/
+
 Mat DispModule::buildRotTras(const Mat& R, const Mat& T)
 {     
     Mat A=Mat::eye(4,4,CV_64F);
@@ -1214,7 +1219,7 @@ Mat DispModule::buildRotTras(const Mat& R, const Mat& T)
 }
 
 
-/******************************************************************************/
+
 Matrix DispModule::getCameraHGazeCtrl(int camera)
 {
     yarp::sig::Vector x_curr;
@@ -1252,7 +1257,7 @@ Matrix DispModule::getCameraHGazeCtrl(int camera)
 }
 
 
-/******************************************************************************/
+
 void DispModule::convert(Matrix& matrix, Mat& mat)
 {
     mat=cv::Mat(matrix.rows(),matrix.cols(),CV_64FC1);
@@ -1262,7 +1267,7 @@ void DispModule::convert(Matrix& matrix, Mat& mat)
 }
 
 
-/******************************************************************************/
+
 void DispModule::convert(Mat& mat, Matrix& matrix)
 {
     matrix.resize(mat.rows,mat.cols);
@@ -1272,7 +1277,7 @@ void DispModule::convert(Mat& mat, Matrix& matrix)
 }
 
 
-/******************************************************************************/
+
 bool DispModule::respond(const Bottle& command, Bottle& reply)
 {
     if(command.size()==0)
@@ -1502,7 +1507,7 @@ bool DispModule::respond(const Bottle& command, Bottle& reply)
     return true;
 }
 
-/******************************************************************************/
+
 Point2f DispModule::projectPoint(const string &camera, double x, double y, double z)
 {
     Point3f point3D;
@@ -1528,7 +1533,7 @@ Point2f DispModule::projectPoint(const string &camera, double x, double y, doubl
     return response[0];
 }
 
-/******************************************************************************/
+
 cv::Mat DispModule::refineDisparity(cv::Mat old_disp, cv::Mat new_disp, int th)
 {
     cv::Mat mask, result;
@@ -1541,7 +1546,7 @@ cv::Mat DispModule::refineDisparity(cv::Mat old_disp, cv::Mat new_disp, int th)
     return result;
 }
 
-/******************************************************************************/
+
 DispModule::~DispModule()
 {
 
@@ -1552,13 +1557,13 @@ DispModule::~DispModule()
 
 }
 
-/******************************************************************************/
+
 DispModule::DispModule()
 {
     
 }
 
-/******************************************************************************/
+
 int main(int argc, char *argv[])
 {
     Network yarp;

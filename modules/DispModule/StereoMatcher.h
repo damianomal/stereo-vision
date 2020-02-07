@@ -12,9 +12,17 @@
 
 #include "opencv2/ximgproc/disparity_filter.hpp"
 
+/**
+* Auxiliary function used for the WLS filtering stage
+* @param src_sz the Size2i object represeenting size of the images considered 
+* @param matcher_instance the StereoMatcher object used for the calculation of the disparity map
+* @return the region of the disparity map to filter
+*
+*/
 Rect computeROI2(Size2i src_sz, Ptr<StereoMatcher> matcher_instance);
 
-// enums to handle the different stereo matching algorithms available
+
+// enum to handle the different stereo matching algorithms available
 
 enum SM_MATCHING_ALG {
     SGBM_OPENCV = 0,
@@ -22,7 +30,8 @@ enum SM_MATCHING_ALG {
     LIBELAS
 };
 
-// enums to handle the different bilateral filtering methods
+
+// enum to handle the different bilateral filtering methods
 
 enum SM_BLF_FILTER {
     BLF_DISABLED = 0,
@@ -30,13 +39,15 @@ enum SM_BLF_FILTER {
     BLF_CUDA
 };
 
-// enums to handle the activation of the WLS filtering
+
+// enum to handle the activation of the WLS filtering
 
 enum SM_WLS_FILTER {
     WLS_DISABLED = 0,
     WLS_ENABLED,
     WLS_LRCHECK
 };
+
 
 // struct containing the parameters for the  
 // stereo matching and filtering algorithms
@@ -63,7 +74,9 @@ typedef struct {
 
 } Params;
 
-// 
+
+// auxiliary struct meant to contain the disparity maps calculated
+// NOTE: not used at the moment in the code
 
 typedef struct {
 
@@ -111,7 +124,7 @@ private:
 
     //
 
-    bool disp_wls_available, disp_blf_available;
+    // bool disp_wls_available, disp_blf_available;
     Ptr<cv::ximgproc::DisparityWLSFilter> wls_filter;
 
     // fields used for the SGBM implementation in CUDA

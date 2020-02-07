@@ -83,7 +83,7 @@ It is possible to add a new stereo matching method by editing the content of jus
      [...]
      // code executing the matching
      [...]
-     this->disparity = resulting_disparity;
+     this->disparity16 = resulting_disparity;
    }
 
    ```
@@ -100,9 +100,19 @@ It is possible to add a new stereo matching method by editing the content of jus
       this->stereo_matching = SM_MATCHING_ALG::METHODX;
    ```
 
+4. file `StereoMatcher.cpp`:
+
+   - add the handling of the new matching algorithm in the `switch` within the `StereoMatcherNew::compute()` function:
+
+   ```cpp
+   case SM_MATCHING_ALG::METHODX:
+      this->matchMethodX();
+      break;
+   ```
+
 The following additional step is optional, and meant to be considered only if you plan to use this module with also the GUI functionalities:
 
-4. (optional) file `cvgui.cpp`:
+1. (optional) file `cvgui.cpp`:
 
    - add a new checkbox to the radioButtons call at line 119 [TODO add hyperlink here]:
 
@@ -141,6 +151,14 @@ The following additional step is optional, and meant to be considered only if yo
            break;
    }
    ```
+---
+
+## **Known (negligible) issues**
+
+A few things are not complete (however, they don't compromise the functionality of the module), and still require a quick correction each one:
+
+   1. the correction of the implementation of the left-right consistency for the WLS filtering
+   2. saving and loading the disparity map refinement threshold from the configuration file
 
 ---
 # OLD README.MD SECTION

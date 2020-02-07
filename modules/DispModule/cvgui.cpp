@@ -6,19 +6,19 @@
 
 const char * WINDOW_NAME = "DisparityModule Parameters";
 
-/******************************************************************************/
+
 GUI::GUI()
 {
 
 }
 
-/******************************************************************************/
+
 bool GUI::isUpdated()
 {
     return this->updated;
 }
 
-/******************************************************************************/
+
 void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWindowSize,
                        int &disp12MaxDiff, int &preFilterCap, int &uniquenessRatio,
                        int &speckleWindowSize, int &speckleRange, double &sigmaColorBLF,
@@ -48,7 +48,7 @@ void GUI::initializeGUI(int &minDisparity, int &numberOfDisparities, int &SADWin
     this->initializeGUI();
 }
 
-/******************************************************************************/
+
 void GUI::initializeGUI()
 {
     // initializes the GUI internal states
@@ -63,13 +63,13 @@ void GUI::initializeGUI()
     cvui::init(WINDOW_NAME, 3);
 }
 
-/******************************************************************************/
+
 void GUI::killGUI()
 {
 
 }
 
-/******************************************************************************/
+
 void GUI::updateGUI()
 {
     // if the window has been closed by the user, 
@@ -166,7 +166,7 @@ void GUI::updateGUI()
     return;
 }
 
-/******************************************************************************/
+
 void GUI::convertIDToEnum()
 {
     switch(this->stereo_matching_id)
@@ -211,7 +211,7 @@ void GUI::convertIDToEnum()
     this->params.numberOfDisparities = 32 * (this->num_disparities_id+1);
 }
 
-/******************************************************************************/
+
 void GUI::convertEnumToID()
 {
     switch(this->params.stereo_matching)
@@ -259,7 +259,7 @@ void GUI::convertEnumToID()
     this->num_disparities_id = (this->params.numberOfDisparities/32)-1;
 }
 
-/******************************************************************************/
+
 void GUI::getParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                         int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                         int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
@@ -284,7 +284,7 @@ void GUI::getParameters(int& minDisparity, int& numberOfDisparities, int& SADWin
     stereo_matching = this->params.stereo_matching;
 }
 
-/******************************************************************************/
+
 void GUI::setParameters(int& minDisparity, int& numberOfDisparities, int& SADWindowSize,
                int& disp12MaxDiff, int& preFilterCap, int& uniquenessRatio,
                int& speckleWindowSize, int& speckleRange, double& sigmaColorBLF,
@@ -309,43 +309,43 @@ void GUI::setParameters(int& minDisparity, int& numberOfDisparities, int& SADWin
     this->params.stereo_matching = stereo_matching;
 }
 
-/******************************************************************************/
+
 bool GUI::isDone()
 {
     return this->done;
 }
 
-/******************************************************************************/
+
 GUI::~GUI()
 {
     this->killGUI();
 }
 
-/******************************************************************************/
+
 bool GUI::toRecalibrate()
 {
     return this->recalibrate;
 }
 
-/******************************************************************************/
+
 bool GUI::toSaveCalibration()
 {
     return this->save_calibration;
 }
 
-/******************************************************************************/
+
 bool GUI::toLoadParameters()
 {
     return this->load_parameters;
 }
 
-/******************************************************************************/
+
 bool GUI::toSaveParameters()
 {
     return this->save_parameters;
 }
 
-/******************************************************************************/
+
 void GUI::resetState()
 {
     this->done = false;
@@ -356,13 +356,13 @@ void GUI::resetState()
     this->save_parameters = false;
 }
 
-/******************************************************************************/
+
 int GUI::getRefineTh()
 {
     return refine_th;
 }
 
-/******************************************************************************/
+
 bool GUI::toRefine()
 {
     return refine_th > 0;
