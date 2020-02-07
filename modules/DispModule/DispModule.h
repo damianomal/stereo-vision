@@ -281,19 +281,20 @@ class DispModule: public yarp::os::RFModule
     Utilities *utils;
 #endif
 
+    // input YARP ports
     yarp::os::Port rpc;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > leftImgPort;
     yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > rightImgPort;
-    yarp::os::BufferedPort<yarp::sig::ImageOf<yarp::sig::PixelRgb> > fakeEyesPort;
     Port handlerPort;
 
     // output YARP ports
     BufferedPort<ImageOf<PixelFloat> > outDepth;
     BufferedPort<ImageOf<PixelMono> >  outDisp;
 
-    //
-
+    // number of trials to consider when recalibrating the system
     int numberOfTrials;
+
+    // path of the camCalib configuration file 
     string camCalibFile;
 
     // stereo matching and calibration auxiliary parameters
@@ -333,7 +334,6 @@ class DispModule: public yarp::os::RFModule
 
     // object handling the stereo matching algorithms
     StereoMatcherNew * matcher;
-
 
     /**
     * Loads the cameras intrinsic matrices
@@ -432,7 +432,6 @@ class DispModule: public yarp::os::RFModule
 
     /**
     * Updates the stereo system translation and rotation parameters by getting the pose of the eyes with respect to the ROOT reference frame
-    * @param update XXXXXXXXXXXXXXX
     *
     */
     void updateViaGazeCtrl(const bool update);
