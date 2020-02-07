@@ -304,6 +304,7 @@ class DispModule: public yarp::os::RFModule
     bool debugWindow;
     bool doBLF;
 
+    // structures meant to hold the stereo parameters
     Params stereo_parameters, original_parameters;
 
     // mutex and other handles needed by the module
@@ -313,7 +314,7 @@ class DispModule: public yarp::os::RFModule
 
     ResourceFinder localCalibration;
 
-    // objects to interfare with the
+    // objects to interface with the robot's state
     PolyDriver headCtrl,gazeCtrl;
     IEncoders* iencs;
     IGazeControl* igaze;

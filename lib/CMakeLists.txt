@@ -91,10 +91,6 @@ if(OPENMP_FOUND)
    target_link_libraries(${PROJECT_NAME} ${OpenMP_C_FLAGS} ${OpenMP_CXX_FLAGS})
 endif()
 
-#set(SGBM_CUDA_DIR "/home/damiano/robotology/forks/stereo-vision/modules/DispModule/sgbm_cuda")
-#include_directories(${SGBM_CUDA_DIR})
-#find_package(SGBM_CUDA REQUIRED)
-
 if(USE_SIFT_GPU)
    icubcontrib_export_library(${PROJECT_NAME} INTERNAL_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/iCub/stereoVision/elas
                                               EXTERNAL_INCLUDE_DIRS ${ICUB_INCLUDE_DIRS} ${OpenCV_LIBRARIES} ${SIFTGPU_INCLUDE_DIRS}

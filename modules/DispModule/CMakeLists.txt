@@ -9,7 +9,7 @@ add_subdirectory(sgbm_cuda)
 set(USE_DISPMODULE_GUI ON CACHE BOOL "Select ON to compile with the GUI code")
 
 set(source DispModule.cpp StereoMatcher.cpp)
-set(header DispModule.h StereoMatcher.h StereoMatcher_enums.h)
+set(header DispModule.h StereoMatcher.h)
 
 if(USE_DISPMODULE_GUI)
     list(APPEND source cvgui.cpp)
@@ -23,8 +23,6 @@ include_directories(${OpenCV_INCLUDE_DIR})
 set(OpenCV_LIBRARIES "opencv_features2d;opencv_imgproc;opencv_core;opencv_cudastereo;opencv_ximgproc;opencv_xfeatures2d")
 link_directories("/usr/local/src/robot/opencv/build-cuda/lib")
 
-#find_library(OpenCV_LIBRARIES NAMES opencv_features2d PATHS "/usr/local/src/robot/opencv/build-cuda/lib")
-
 find_package(CUDA REQUIRED)
 
 include_directories(${CUDA_INCLUDE_DIRS})
@@ -32,11 +30,6 @@ include_directories("../../lib/include")
 
 include_directories(${stereoVision_INCLUDE_DIRS})
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/sgbm_cuda")
-
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DALLOW_IDL_GENERATION=ON")
-
-#set(${PROJECT_NAME}_THRIFT_HDR thrift/DispModule_IDL.thrift)
-#yarp_add_idl(${PROJECT_NAME}_THRIFT_SRC ${${PROJECT_NAME}_THRIFT_HDR})
 
 add_executable(${PROJECT_NAME} ${source} ${header})
 
@@ -56,15 +49,3 @@ if(USE_SIFT_GPU)
 endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
-
-#set(generated_libs_dir "${CMAKE_CURRENT_SOURCE_DIR}")
-
-#yarp_idl_to_dir(INPUT_FILES DispModule_IDL.thrift
-#                OUTPUT_DIR ${generated_libs_dir}
-#                SOURCES_VAR sources
-#                HEADERS_VAR headers
-#                INCLUDE_DIRS_VAR include_dirs)
-
-
-
-
